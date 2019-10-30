@@ -11,7 +11,10 @@ import java.util.concurrent.TimeUnit;
 public class Main {
 
     static final int BROADCAST_PORT = 4445;
+    static final int COORD_PORT = 4447;
     static final int PORT = 4446;
+
+    static boolean writing = false;
 
     public static void main(String[] args) throws IOException, InterruptedException {
         if (args.length < 2) {
@@ -26,22 +29,30 @@ public class Main {
 
         // If I'm coordnator
         int myId = Integer.parseInt(lines.get(line).split(" ", 3)[0]);
-        if (isCoordinator(lines, myId)) {
+        String[] coordinator = getCoordinator(lines);
+
+        if (Integer.parseInt(coordinator[0]) == myId) {
+            System.out.println("> is coordinator");
+
             // Tell the other I'm the coordnator
             broadcast(myId);
             // Wait for requests
-            receveRequests();
+            receiveRequests();
 
         } else {
-            String coordinatorHost = getCoordinatorHost(lines);
+            String coordinatorHost = coordinator[1];
+            System.out.println("> coordinatorHost: " + coordinatorHost);
+
             // wait for broadcast message from coordinator
-            String coordinatorId = receiveBroadcast();
+            String response = receiveBroadcast();
+            int coordinatorId = Integer.parseInt(response.split(" ", 2)[1]);
+            System.out.println("> coordinatorId: " + coordinatorId);
 
             // Send request to coordinator
-            sendRequests(coordinatorHost);
+            requestPermission(coordinatorHost, "write");
 
             // If request failed, start an election
-            startElection(lines, myId);
+            // startElection(lines, myId);
 
             // If I'm allowed, write in the file
 
@@ -50,24 +61,7 @@ public class Main {
         TimeUnit.SECONDS.sleep(1);
     }
 
-    public static boolean isCoordinator(List<String> lines, int myId) {
-        int greaterId = 0;
-
-        for (int i = 0; i < lines.size(); i++) {
-            String[] data = lines.get(i).split(" ", 3);
-            int id = Integer.parseInt(data[0]);
-
-            if (id > greaterId)
-                greaterId = id;
-        }
-
-        if (greaterId == myId)
-            return true;
-
-        return false;
-    }
-
-    public static String getCoordinatorHost(List<String> lines) {
+    public static String[] getCoordinator(List<String> lines) {
         int line = 0;
         int greaterId = 0;
 
@@ -84,10 +78,11 @@ public class Main {
 
         String[] data = lines.get(line).split(" ", 3);
 
-        return data[1];
+        return data;
     }
 
     public static void broadcast(int id) throws IOException {
+        System.out.println("> broadcast");
         InetAddress address = InetAddress.getByName("255.255.255.255");
         DatagramSocket socket = new DatagramSocket();
         socket.setBroadcast(true);
@@ -101,15 +96,16 @@ public class Main {
             socket.close();
 
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            System.out.println("Error on broadcast. " + e.getMessage());
             socket.close();
         }
     }
 
     public static String receiveBroadcast() throws IOException {
+        System.out.println("> receiveBroadcast");
         DatagramSocket socket = new DatagramSocket(BROADCAST_PORT);
         try {
-            byte[] receiveData = new byte[8];
+            byte[] receiveData = new byte[16];
 
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
@@ -119,51 +115,76 @@ public class Main {
 
             return response;
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            System.out.println("Error on receiveBroadcast. " + e.getMessage());
             socket.close();
             return null;
         }
     }
 
-    public static void receveRequests() throws IOException {
-        DatagramSocket socket = new DatagramSocket(PORT);
+    public static void receiveRequests() throws IOException {
+        System.out.println("> receiveRequests");
+        DatagramSocket socket = new DatagramSocket(COORD_PORT);
 
         try {
-            byte[] receiveData = new byte[8];
+            byte[] receiveData = new byte[16];
 
             while (true) {
                 DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
                 socket.receive(receivePacket);
+
                 String response = new String(receivePacket.getData(), 0, receivePacket.getLength());
 
-                System.out.println(response);
+                System.out.println("response: " + response);
+
+                if (response.equals("write") || response.equals("read")) {
+                    if (writing) {
+                        sendMessage(receivePacket.getAddress().getHostName(), "denied");
+                    } else {
+                        sendMessage(receivePacket.getAddress().getHostName(), "granted");
+                    }
+                }
             }
 
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            System.out.println("Error on receiveRequests. " + e.getMessage());
             socket.close();
         }
     }
 
-    public static void sendRequests(String host) throws IOException {
+    /**
+     * Request permission to coordinator
+     * 
+     * @type (write | read)
+     */
+    public static void requestPermission(String host, String type) throws IOException {
+        System.out.println("> sendRequests");
         DatagramSocket socket = new DatagramSocket();
         try {
             InetAddress address = InetAddress.getByName(host);
+            System.out.println(address);
 
-            String message = "write string";
-            byte[] buffer = message.getBytes();
+            byte[] buffer = type.getBytes();
 
-            DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, BROADCAST_PORT);
+            DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, COORD_PORT);
             socket.send(packet);
             socket.close();
+
+            String response = receiveMessage();
+            System.out.println("Response received: " + response);
+
+            if (response.equals("granted")) {
+                // TODO write
+            }
+
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            System.out.println("Error on requestPermission, " + e.getMessage());
             socket.close();
         }
     }
 
     public static void startElection(List<String> lines, int myId) {
+        System.out.println("> startElection");
         try {
 
             // Get hosts with IDs greater than mine
@@ -188,23 +209,45 @@ public class Main {
             }
 
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            System.out.println("Error on startElection. " + e.getMessage());
         }
     }
 
     public static void sendMessage(String host, String message) throws UnknownHostException, SocketException {
+        System.out.println("> sendMessage " + message + " to " + host);
         InetAddress address = InetAddress.getByName(host);
         DatagramSocket socket = new DatagramSocket();
 
         try {
             byte[] buffer = message.getBytes();
-
-            DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, BROADCAST_PORT);
+            DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, PORT);
             socket.send(packet);
             socket.close();
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            System.out.println("Error on sendMessage. " + e.getMessage());
             socket.close();
+        }
+    }
+
+    public static String receiveMessage() throws IOException {
+        System.out.println("> receiveMessage");
+        DatagramSocket socket = new DatagramSocket(PORT);
+
+        try {
+            byte[] receiveData = new byte[16];
+
+            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+
+            socket.receive(receivePacket);
+            String response = new String(receivePacket.getData(), 0, receivePacket.getLength());
+            socket.close();
+
+            return response;
+
+        } catch (Exception e) {
+            System.out.println("Error on receiveMessage. " + e.getMessage());
+            socket.close();
+            return null;
         }
     }
 
