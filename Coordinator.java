@@ -5,16 +5,35 @@ import java.net.InetAddress;
 
 public class Coordinator {
 
-    static final int BROADCAST_PORT = 4445;
-    static final int COORD_PORT = 4447;
-    static final int PORT = 4446;
-
     static boolean writing = false;
 
     int id;
 
     public Coordinator(int id) {
         this.id = id;
+    }
+
+    public boolean run() {
+
+        try {
+            // Tell the other I'm the coordnator
+            this.broadcast();
+        } catch (IOException e) {
+            System.out.println("Error on Coordinator. " + e.getMessage());
+        }
+
+        while (true) {
+            try {
+                // Wait for requests
+                this.receiveRequests();
+
+            } catch (Exception e) {
+                System.out.println("Error on Coordintor. " + e.getMessage());
+                break;
+            }
+        }
+
+        return false;
     }
 
     public void broadcast() throws IOException {
@@ -27,7 +46,7 @@ public class Coordinator {
             String broadcastMessage = "coordinator " + this.id;
             byte[] buffer = broadcastMessage.getBytes();
 
-            DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, BROADCAST_PORT);
+            DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, Constants.BROADCAST_PORT);
             socket.send(packet);
             socket.close();
 
@@ -39,32 +58,22 @@ public class Coordinator {
 
     public void receiveRequests() throws IOException {
         System.out.println("> receiveRequests");
-        DatagramSocket socket = new DatagramSocket(COORD_PORT);
-
         try {
-            byte[] receiveData = new byte[16];
-
             while (true) {
-                DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-
-                socket.receive(receivePacket);
-
-                String response = new String(receivePacket.getData(), 0, receivePacket.getLength());
-
+                Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, 0);
                 System.out.println("response: " + response);
 
-                if (response.equals("write") || response.equals("read")) {
+                if (response.message.equals("write") || response.message.equals("read")) {
                     if (writing) {
-                        SocketHelper.sendMessage(receivePacket.getAddress().getHostName(), "denied");
+                        SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "denied");
                     } else {
-                        SocketHelper.sendMessage(receivePacket.getAddress().getHostName(), "granted");
+                        SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "granted");
                     }
                 }
             }
 
         } catch (Exception e) {
             System.out.println("Error on receiveRequests. " + e.getMessage());
-            socket.close();
         }
     }
 

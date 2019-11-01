@@ -15,12 +15,6 @@ import java.util.concurrent.TimeUnit;
 
 public class Main {
 
-    static final int BROADCAST_PORT = 4445;
-    static final int COORD_PORT = 4447;
-    static final int PORT = 4446;
-
-    static boolean writing = false;
-
     public static void main(String[] args) throws IOException, InterruptedException {
         if (args.length < 2) {
             System.out.println("Insufficient arguments");
@@ -32,43 +26,42 @@ public class Main {
 
         List<String> lines = FileHelper.read(filename);
 
-        // If I'm coordnator
-        int myId = Integer.parseInt(lines.get(line).split(" ", 3)[0]);
+        int id = Integer.parseInt(lines.get(line).split(" ", 3)[0]);
         String[] coordinatorData = getCoordinator(lines);
 
-        if (Integer.parseInt(coordinatorData[0]) == myId) {
+        if (Integer.parseInt(coordinatorData[0]) == id) {
             System.out.println("> is coordinator");
-
-            Coordinator coordinator = new Coordinator(myId);
-
-            // Tell the other I'm the coordnator
-            coordinator.broadcast();
-
-            // Wait for requests
-            coordinator.receiveRequests();
+            setupCoordinator(id);
 
         } else {
             String coordinatorHost = coordinatorData[1];
-            System.out.println("> coordinatorHost: " + coordinatorHost);
+            setupNode(coordinatorHost, id);
+        }
+    }
 
-            Node node = new Node(myId, coordinatorHost);
+    public static void setupCoordinator(int id) {
+        Coordinator coordinator = new Coordinator(id);
+        coordinator.run();
+    }
 
-            // wait for broadcast message from coordinator
-            String response = node.receiveBroadcast();
-            int coordinatorId = Integer.parseInt(response.split(" ", 2)[1]);
-            System.out.println("> coordinatorId: " + coordinatorId);
+    public static void setupNode(String coordinatorHost, int id) {
+        Node node = new Node(id, coordinatorHost);
+        node.run();
 
-            // Send request to coordinator
-            node.requestPermission("write");
+        /**
+         * Node's run is a loop that only breaks if coordinator doesn't answer
+         * (timeout), so if the program reach this line it has to start an election or
+         * an election has started
+         */
 
-            // If request failed, start an election
-            // startElection(lines, myId);
-
-            // If I'm allowed, write in the file
-
+        if (node.electionStarted) {
+            // TODO an election has started
+            System.out.println("> Start election");
+        } else {
+            // TODO start election
+            System.out.println("> Start election");
         }
 
-        TimeUnit.SECONDS.sleep(1);
     }
 
     public static String[] getCoordinator(List<String> lines) {
@@ -87,29 +80,6 @@ public class Main {
         }
 
         String[] data = lines.get(line).split(" ", 3);
-
         return data;
     }
-    /*
-     * public static void startElection(List<String> lines, int myId) {
-     * System.out.println("> startElection"); try {
-     * 
-     * // Get hosts with IDs greater than mine
-     * 
-     * ArrayList<String> hosts = new ArrayList<>();
-     * 
-     * for (int i = 0; i < lines.size(); i++) { String[] data =
-     * lines.get(i).split(" ", 3); int id = Integer.parseInt(data[0]); if (id >
-     * myId) hosts.add(data[1]); }
-     * 
-     * // If there are no hosts with with greater than mine, I'm the coordinator if
-     * (hosts.size() == 0) { // TODO }
-     * 
-     * for (int i = 0; i < lines.size(); i++) { // Send election message
-     * sendMessage(lines.get(i), "election " + myId); }
-     * 
-     * } catch (Exception e) { System.out.println("Error on startElection. " +
-     * e.getMessage()); } }
-     */
-
 }
