@@ -43,6 +43,7 @@ public class Node {
 
                 if (permission.equals("granted")) {
                     // TODO write
+                    this.sendRelease();
                 }
 
                 TimeUnit.SECONDS.sleep(1);
@@ -89,7 +90,7 @@ public class Node {
 
             byte[] buffer = type.getBytes();
 
-            DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, Constants.BROADCAST_PORT);
+            DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, Constants.COORD_PORT);
             socket.send(packet);
             socket.close();
 
@@ -107,20 +108,46 @@ public class Node {
         }
     }
 
+    /**
+     * Send release message to coordinator
+     * 
+     * @type (write | read)
+     */
+    public void sendRelease() throws IOException, SocketTimeoutException {
+        System.out.println("> sendRelease");
+        try {
+            SocketHelper.sendMessage(this.coordinatorHost, Constants.BROADCAST_PORT, "release");
+        } catch (Exception e) {
+            System.out.println("Error on sendRelease, " + e.getMessage());
+        }
+    }
+
     public void listenElectionMessages() throws IOException {
         try {
             Response response = SocketHelper.receiveMessage(Constants.MESSAGE_ELECTION_PORT, 0);
             String id = response.message.split(" ", 2)[1];
             this.electionReceivedId = Integer.parseInt(id);
+            this.electionStarted = true;
+
+            SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "ack");
+
         } catch (Exception e) {
             System.out.println("Error on listenElectionMessages, " + e.getMessage());
         }
     }
 
-    public void startElection(List<String> lines) {
+    /**
+     * 2 = this is the new coordinator, 1 = another node is the new coordinator
+     * 
+     * @param lines
+     * @return int
+     * 
+     */
+    public int startElection(List<String> lines) {
         System.out.println("> startElection");
 
         try {
+            Boolean anyHostAnswered = false;
             // Get hosts with IDs greater than mine
             ArrayList<String> hosts = new ArrayList<>();
 
@@ -133,17 +160,34 @@ public class Node {
 
             // If there are no hosts with id greater than mine, I'm the coordinator
             if (hosts.size() == 0) {
-                // TODO
+                this.electionReceivedId = 0;
+                this.electionStarted = false;
+                return 2;
             }
 
             for (int i = 0; i < lines.size(); i++) {
                 // Send election message
                 String message = "election " + this.id;
                 SocketHelper.sendMessage(lines.get(i), Constants.MESSAGE_ELECTION_PORT, message);
+
+                try {
+                    SocketHelper.receiveMessage(Constants.MESSAGE_PORT, 1000 * 5);
+                    anyHostAnswered = true;
+                } catch (SocketTimeoutException e) {
+                    System.out.println("> Node " + lines.get(i) + " did not answered");
+                    continue;
+                }
             }
+
+            if (anyHostAnswered) {
+                return 1;
+            }
+
+            return 2;
 
         } catch (Exception e) {
             System.out.println("Error on startElection. " + e.getMessage());
+            return 0;
         }
     }
 

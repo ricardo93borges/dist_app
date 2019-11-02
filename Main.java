@@ -35,7 +35,7 @@ public class Main {
 
         } else {
             String coordinatorHost = coordinatorData[1];
-            setupNode(coordinatorHost, id);
+            setupNode(coordinatorHost, id, lines);
         }
     }
 
@@ -44,7 +44,7 @@ public class Main {
         coordinator.run();
     }
 
-    public static void setupNode(String coordinatorHost, int id) {
+    public static void setupNode(String coordinatorHost, int id, List<String> lines) {
         Node node = new Node(id, coordinatorHost);
         node.run();
 
@@ -54,14 +54,14 @@ public class Main {
          * an election has started
          */
 
-        if (node.electionStarted) {
-            // TODO an election has started
-            System.out.println("> Start election");
-        } else {
-            // TODO start election
-            System.out.println("> Start election");
-        }
+        System.out.println("> Start election");
+        int response = node.startElection(lines);
 
+        if (response == 1) {
+            setupNode(coordinatorHost, id, lines);
+        } else {
+            setupCoordinator(id);
+        }
     }
 
     public static String[] getCoordinator(List<String> lines) {
