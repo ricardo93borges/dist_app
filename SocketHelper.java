@@ -8,7 +8,6 @@ import java.net.UnknownHostException;
 public class SocketHelper {
 
     public static void sendMessage(String host, int port, String message) throws UnknownHostException, SocketException {
-        System.out.println("> sendMessage " + message + " to " + host);
         InetAddress address = InetAddress.getByName(host);
         DatagramSocket socket = new DatagramSocket();
 
@@ -24,7 +23,6 @@ public class SocketHelper {
     }
 
     public static Response receiveMessage(int port, int timeout) throws IOException {
-        System.out.println("> receiveMessage");
         DatagramSocket socket = new DatagramSocket(port);
         socket.setSoTimeout(timeout);
 

@@ -60,8 +60,8 @@ public class Coordinator {
         System.out.println("> receiveRequests");
         try {
             while (true) {
-                Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, 0);
-                System.out.println("response: " + response);
+                Response response = SocketHelper.receiveMessage(Constants.COORD_PORT, 0);
+                System.out.println("response: " + response.message);
 
                 if (response.message.equals("write") || response.message.equals("read")) {
                     if (writing) {

@@ -22,11 +22,13 @@ public class Node {
     }
 
     public boolean run() {
-        /*
-         * try { // wait for broadcast message from coordinator this.receiveBroadcast();
-         * } catch (IOException e) { System.out.println("Error on Node. " +
-         * e.getMessage()); }
-         */
+
+        // wait for broadcast message from coordinator
+        try {
+            this.receiveBroadcast();
+        } catch (IOException e) {
+            System.out.println("Error on Node. " + e.getMessage());
+        }
 
         while (true) {
             try {
@@ -83,27 +85,17 @@ public class Node {
      * @type (write | read)
      */
     public String requestPermission(String type) throws IOException, SocketTimeoutException {
-        DatagramSocket socket = new DatagramSocket();
+        System.out.println("> requestPermission");
         try {
-            InetAddress address = InetAddress.getByName(this.coordinatorHost);
-            System.out.println(address);
+            SocketHelper.sendMessage(this.coordinatorHost, Constants.COORD_PORT, type);
 
-            byte[] buffer = type.getBytes();
-
-            DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, Constants.COORD_PORT);
-            socket.send(packet);
-            socket.close();
-
-            int port = Constants.MESSAGE_PORT;
-            int timeout = 1000 * 10;
-            Response response = SocketHelper.receiveMessage(port, timeout);
+            Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, 1000 * 5);
             System.out.println("Response received: " + response.message);
 
             return response.message;
 
         } catch (Exception e) {
             System.out.println("Error on requestPermission, " + e.getMessage());
-            socket.close();
             return "";
         }
     }
