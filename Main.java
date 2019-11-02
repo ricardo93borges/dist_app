@@ -35,6 +35,7 @@ public class Main {
 
         } else {
             String coordinatorHost = coordinatorData[1];
+            System.out.println("coordinatorHost: " + coordinatorHost);
             setupNode(coordinatorHost, id, lines);
         }
     }
@@ -75,7 +76,6 @@ public class Main {
             if (id > greaterId) {
                 greaterId = id;
                 line = i;
-                break;
             }
         }
 
