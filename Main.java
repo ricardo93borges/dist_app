@@ -4,14 +4,7 @@
  */
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.SocketException;
-import java.net.UnknownHostException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 public class Main {
 
@@ -55,14 +48,13 @@ public class Main {
          * an election has started
          */
 
-        System.out.println("> Start election");
         int response = node.startElection(lines);
-
         if (response == 1) {
-            setupNode(coordinatorHost, id, lines);
+            setupNode(null, id, lines);
         } else {
             setupCoordinator(id);
         }
+
     }
 
     public static String[] getCoordinator(List<String> lines) {

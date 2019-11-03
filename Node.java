@@ -1,7 +1,6 @@
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,16 +23,19 @@ public class Node {
     public boolean run() {
 
         // wait for broadcast message from coordinator
-        try {
-            this.receiveBroadcast();
-        } catch (IOException e) {
-            System.out.println("Error on Node. " + e.getMessage());
+        if (this.coordinatorHost == null) {
+            try {
+                this.receiveBroadcast();
+            } catch (IOException e) {
+                System.out.println("[Node] Error on Node. " + e.getMessage());
+            }
         }
 
         while (true) {
             try {
 
                 if (this.electionStarted) {
+                    System.out.println("> Election started ");
                     break;
                 }
 
@@ -50,7 +52,7 @@ public class Node {
 
                 TimeUnit.SECONDS.sleep(1);
             } catch (Exception e) {
-                System.out.println("Error on Node. " + e.getMessage());
+                System.out.println("[Node] Error on Node. " + e.getMessage());
                 break;
             }
         }
@@ -72,7 +74,7 @@ public class Node {
 
             return response;
         } catch (Exception e) {
-            System.out.println("Error on receiveBroadcast. " + e.getMessage());
+            System.out.println("[Node] Error on receiveBroadcast. " + e.getMessage());
             return null;
         } finally {
             socket.close();
@@ -95,8 +97,8 @@ public class Node {
             return response.message;
 
         } catch (Exception e) {
-            System.out.println("Error on requestPermission, " + e.getMessage());
-            return "";
+            System.out.println("[Node] Error on requestPermission, " + e.getMessage());
+            return null;
         }
     }
 
@@ -108,9 +110,9 @@ public class Node {
     public void sendRelease() throws IOException, SocketTimeoutException {
         System.out.println("> sendRelease");
         try {
-            SocketHelper.sendMessage(this.coordinatorHost, Constants.BROADCAST_PORT, "release");
+            SocketHelper.sendMessage(this.coordinatorHost, Constants.COORD_PORT, "release");
         } catch (Exception e) {
-            System.out.println("Error on sendRelease, " + e.getMessage());
+            System.out.println("[Node] Error on sendRelease, " + e.getMessage());
         }
     }
 
@@ -124,7 +126,7 @@ public class Node {
             SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "ack");
 
         } catch (Exception e) {
-            System.out.println("Error on listenElectionMessages, " + e.getMessage());
+            System.out.println("[Node] Error on listenElectionMessages, " + e.getMessage());
         }
     }
 
@@ -157,16 +159,19 @@ public class Node {
                 return 2;
             }
 
-            for (int i = 0; i < lines.size(); i++) {
+            for (int i = 0; i < hosts.size(); i++) {
                 // Send election message
                 String message = "election " + this.id;
-                SocketHelper.sendMessage(lines.get(i), Constants.MESSAGE_ELECTION_PORT, message);
-
+                String host = hosts.get(i);
+                SocketHelper.sendMessage(host, Constants.MESSAGE_ELECTION_PORT, message);
                 try {
-                    SocketHelper.receiveMessage(Constants.MESSAGE_PORT, 1000 * 5);
-                    anyHostAnswered = true;
+                    Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, 1000 * 5);
+
+                    if (response.message != null)
+                        anyHostAnswered = true;
+
                 } catch (SocketTimeoutException e) {
-                    System.out.println("> Node " + lines.get(i) + " did not answered");
+                    System.out.println("[Node] Node " + lines.get(i) + " did not answered");
                     continue;
                 }
             }
@@ -178,7 +183,7 @@ public class Node {
             return 2;
 
         } catch (Exception e) {
-            System.out.println("Error on startElection. " + e.getMessage());
+            System.out.println("[Node] Error on startElection. " + e.getMessage());
             return 0;
         }
     }

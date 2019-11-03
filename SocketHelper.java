@@ -16,8 +16,13 @@ public class SocketHelper {
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, port);
             socket.send(packet);
             socket.close();
-        } catch (Exception e) {
-            System.out.println("Error on sendMessage. " + e.getMessage());
+        } catch (IOException e) {
+            System.out.println(">>");
+            System.out.println(host);
+            System.out.println(port);
+            System.out.println(message);
+            System.out.println(">>");
+            System.out.println("[SocketHelper] Error on sendMessage. " + e.getMessage());
             socket.close();
         }
     }
@@ -38,8 +43,8 @@ public class SocketHelper {
 
             return new Response(message, hostname);
 
-        } catch (Exception e) {
-            System.out.println("Error on receiveMessage. " + e.getMessage());
+        } catch (IOException e) {
+            System.out.println("[SocketHelper] Error on receiveMessage. " + e.getMessage());
             socket.close();
             return null;
         }
