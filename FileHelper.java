@@ -22,7 +22,7 @@ public class FileHelper {
     }
 
     public static void write(String filename, String content) {
-        try (FileWriter writer = new FileWriter("app.log", true); BufferedWriter bw = new BufferedWriter(writer)) {
+        try (FileWriter writer = new FileWriter(filename, true); BufferedWriter bw = new BufferedWriter(writer)) {
             bw.write(content);
             bw.write("\n");
         } catch (IOException e) {

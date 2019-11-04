@@ -2,8 +2,10 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketTimeoutException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -16,6 +18,7 @@ public class Node {
     int electionReceivedId;
     Thread electionListener;
     List<String> lines;
+    int action;
 
     public Node(int id, String coordinatorHost, List<String> lines) {
         this.id = id;
@@ -24,6 +27,7 @@ public class Node {
         this.electionReceivedId = 0;
         this.electionListener = new Thread();
         this.lines = lines;
+        this.action = 1;
     }
 
     public void setElectionStarted(boolean electionStarted) {
@@ -78,15 +82,25 @@ public class Node {
                     break;
                 }
 
-                // Request permission to coordinator
-                String permission = this.requestPermission("write");
+                if (this.action == 1) {
 
-                if (permission == null)
-                    break;
+                    String permission = this.requestPermission("write");
+                    System.out.println(permission);
 
-                if (permission.equals("granted")) {
-                    // TODO write
-                    this.sendRelease();
+                    if (permission == null)
+                        break;
+
+                    this.sendWrite();
+                    this.action = 0;
+                } else {
+                    String permission = this.requestPermission("read");
+                    System.out.println(permission);
+
+                    if (permission == null)
+                        break;
+
+                    this.sendRead();
+                    this.action = 1;
                 }
 
                 TimeUnit.SECONDS.sleep(1);
@@ -150,17 +164,51 @@ public class Node {
         }
     }
 
-    /**
-     * Send release message to coordinator
-     * 
-     * @type (write | read)
-     */
     public void sendRelease() throws IOException, SocketTimeoutException {
         System.out.println("> sendRelease");
         try {
             SocketHelper.sendMessage(this.coordinatorHost, Constants.COORD_PORT, "release");
         } catch (Exception e) {
             System.out.println("[Node] Error on sendRelease, " + e.getMessage());
+        }
+    }
+
+    public String generateString() {
+        int leftLimit = 97;
+        int rightLimit = 122;
+        int targetStringLength = 10;
+
+        Random random = new Random();
+        StringBuilder buffer = new StringBuilder(targetStringLength);
+
+        for (int i = 0; i < targetStringLength; i++) {
+            int randomLimitedInt = leftLimit + (int) (random.nextFloat() * (rightLimit - leftLimit + 1));
+            buffer.append((char) randomLimitedInt);
+        }
+
+        String str = buffer.toString();
+        return str;
+    }
+
+    public void sendWrite() throws IOException, SocketTimeoutException {
+        System.out.println("> sendWrite");
+        try {
+            String message = "write " + generateString();
+            SocketHelper.sendMessage(Constants.ARCHIVE_HOST, Constants.ARCHIVE_PORT, message);
+
+        } catch (Exception e) {
+            System.out.println("[Node] Error on sendWrite, " + e.getMessage());
+        }
+    }
+
+    public void sendRead() throws IOException, SocketTimeoutException {
+        System.out.println("> sendRead");
+        try {
+            SocketHelper.sendMessage(Constants.ARCHIVE_HOST, Constants.ARCHIVE_PORT, "read");
+            Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, 0);
+            System.out.println("[Node] read line: " + response.message);
+        } catch (Exception e) {
+            System.out.println("[Node] Error on sendRead, " + e.getMessage());
         }
     }
 
@@ -259,5 +307,4 @@ public class Node {
             return 2;
         }
     }
-
 }
