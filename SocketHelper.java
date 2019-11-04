@@ -19,6 +19,8 @@ public class SocketHelper {
         } catch (IOException e) {
             System.out.println("[SocketHelper] Error on sendMessage. " + e.getMessage());
             socket.close();
+        } finally {
+            socket.close();
         }
     }
 
@@ -28,7 +30,6 @@ public class SocketHelper {
 
         try {
             byte[] receiveData = new byte[16];
-
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
             socket.receive(receivePacket);
@@ -42,6 +43,8 @@ public class SocketHelper {
             System.out.println("[SocketHelper] Error on receiveMessage. " + e.getMessage());
             socket.close();
             return null;
+        } finally {
+            socket.close();
         }
     }
 }

@@ -39,7 +39,7 @@ public class Main {
     }
 
     public static void setupNode(String coordinatorHost, int id, List<String> lines) {
-        Node node = new Node(id, coordinatorHost);
+        Node node = new Node(id, coordinatorHost, lines);
         node.run();
 
         /**
@@ -50,6 +50,7 @@ public class Main {
 
         int response = node.startElection(lines);
         node.electionListener.interrupt();
+        node = null;
         if (response == 1) {
             setupNode(null, id, lines);
         } else {

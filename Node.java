@@ -4,6 +4,8 @@ import java.net.DatagramSocket;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 public class Node {
@@ -13,13 +15,15 @@ public class Node {
     boolean electionStarted;
     int electionReceivedId;
     Thread electionListener;
+    List<String> lines;
 
-    public Node(int id, String coordinatorHost) {
+    public Node(int id, String coordinatorHost, List<String> lines) {
         this.id = id;
         this.coordinatorHost = coordinatorHost;
         this.electionStarted = false;
         this.electionReceivedId = 0;
         this.electionListener = new Thread();
+        this.lines = lines;
     }
 
     public void setElectionStarted(boolean electionStarted) {
@@ -30,12 +34,31 @@ public class Node {
         this.electionReceivedId = electionReceivedId;
     }
 
+    public void runningThreads() {
+        Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
+        for (Thread t : threadSet) {
+            System.out.println("Thread " + " id: " + t.getId() + " | " + t.getName());
+        }
+    }
+
+    public boolean isThreadRunning(String name) {
+        Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
+        for (Thread t : threadSet) {
+            if (t.getName().equals(name))
+                return true;
+        }
+        return false;
+    }
+
     public boolean run() {
 
         // wait for broadcast message from coordinator
         if (this.coordinatorHost == null) {
             try {
-                this.receiveBroadcast();
+                String response = this.receiveBroadcast();
+                System.out.println("[Node] Res. " + response);
+                String id = response.split(" ", 2)[1];
+                this.coordinatorHost = this.getHostById(Integer.parseInt(id));
             } catch (IOException e) {
                 System.out.println("[Node] Error on Node. " + e.getMessage());
             }
@@ -44,7 +67,7 @@ public class Node {
         try {
             this.listenElectionMessages();
         } catch (IOException e) {
-            System.out.println("[Node] Error on Node. " + e.getMessage());
+            // TODO: handle exception
         }
 
         while (true) {
@@ -76,6 +99,15 @@ public class Node {
         return false;
     }
 
+    public String getHostById(int id) {
+        for (String line : this.lines) {
+            String[] data = line.split(" ", 3);
+            if (Integer.parseInt(data[0]) == id)
+                return data[1];
+        }
+        return null;
+    }
+
     public String receiveBroadcast() throws IOException {
         System.out.println("> receiveBroadcast");
         DatagramSocket socket = new DatagramSocket(Constants.BROADCAST_PORT);
@@ -103,11 +135,11 @@ public class Node {
      * @type (write | read)
      */
     public String requestPermission(String type) throws IOException, SocketTimeoutException {
-        System.out.println("> requestPermission");
+        System.out.println("> requestPermission to " + this.coordinatorHost);
         try {
             SocketHelper.sendMessage(this.coordinatorHost, Constants.COORD_PORT, type);
 
-            Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, 1000 * 5);
+            Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, Constants.TIMOUT);
             System.out.println("Response received: " + response.message);
 
             return response.message;
@@ -134,9 +166,12 @@ public class Node {
 
     public void listenElectionMessages() throws IOException {
         System.out.println("> listenElectionMessages");
-        if (this.electionListener.isAlive()) {
+
+        if (isThreadRunning("ElectionListener")) {
+            System.out.println("> Election listener alive !!!");
             return;
         }
+
         try {
             this.electionListener = new Thread(new Runnable() {
                 @Override
@@ -148,7 +183,7 @@ public class Node {
                         setElectionStarted(true);
                         setElectionReceivedId(Integer.parseInt(id));
 
-                        System.out.println(">>> received election messasge" + response.message);
+                        System.out.println(">>> received election messasge " + response.message);
                         System.out.println(">>> sending messasge to " + response.hostname);
 
                         SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "ack");
@@ -158,6 +193,7 @@ public class Node {
                 }
             });
 
+            this.electionListener.setName("ElectionListener");
             this.electionListener.start();
 
         } catch (Exception e) {
@@ -199,11 +235,13 @@ public class Node {
                 String host = hosts.get(i);
                 SocketHelper.sendMessage(host, Constants.MESSAGE_ELECTION_PORT, message);
                 try {
-                    Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, 1000 * 5);
+                    Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, Constants.TIMOUT);
                     System.out.println("> response received: " + response.message);
 
-                    if (response.message != null)
+                    if (response.message != null) {
                         anyHostAnswered = true;
+                        break;
+                    }
 
                 } catch (SocketTimeoutException e) {
                     System.out.println("[Node] Node " + lines.get(i) + " did not answered");
