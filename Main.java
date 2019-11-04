@@ -49,6 +49,7 @@ public class Main {
          */
 
         int response = node.startElection(lines);
+        node.electionListener.interrupt();
         if (response == 1) {
             setupNode(null, id, lines);
         } else {

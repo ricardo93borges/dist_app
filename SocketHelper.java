@@ -17,11 +17,6 @@ public class SocketHelper {
             socket.send(packet);
             socket.close();
         } catch (IOException e) {
-            System.out.println(">>");
-            System.out.println(host);
-            System.out.println(port);
-            System.out.println(message);
-            System.out.println(">>");
             System.out.println("[SocketHelper] Error on sendMessage. " + e.getMessage());
             socket.close();
         }

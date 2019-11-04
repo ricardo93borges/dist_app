@@ -12,12 +12,22 @@ public class Node {
     String coordinatorHost;
     boolean electionStarted;
     int electionReceivedId;
+    Thread electionListener;
 
     public Node(int id, String coordinatorHost) {
         this.id = id;
         this.coordinatorHost = coordinatorHost;
         this.electionStarted = false;
         this.electionReceivedId = 0;
+        this.electionListener = new Thread();
+    }
+
+    public void setElectionStarted(boolean electionStarted) {
+        this.electionStarted = electionStarted;
+    }
+
+    public void setElectionReceivedId(int electionReceivedId) {
+        this.electionReceivedId = electionReceivedId;
     }
 
     public boolean run() {
@@ -29,6 +39,12 @@ public class Node {
             } catch (IOException e) {
                 System.out.println("[Node] Error on Node. " + e.getMessage());
             }
+        }
+
+        try {
+            this.listenElectionMessages();
+        } catch (IOException e) {
+            System.out.println("[Node] Error on Node. " + e.getMessage());
         }
 
         while (true) {
@@ -117,13 +133,32 @@ public class Node {
     }
 
     public void listenElectionMessages() throws IOException {
+        System.out.println("> listenElectionMessages");
+        if (this.electionListener.isAlive()) {
+            return;
+        }
         try {
-            Response response = SocketHelper.receiveMessage(Constants.MESSAGE_ELECTION_PORT, 0);
-            String id = response.message.split(" ", 2)[1];
-            this.electionReceivedId = Integer.parseInt(id);
-            this.electionStarted = true;
+            this.electionListener = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        System.out.println("> start thread");
+                        Response response = SocketHelper.receiveMessage(Constants.MESSAGE_ELECTION_PORT, 0);
+                        String id = response.message.split(" ", 2)[1];
+                        setElectionStarted(true);
+                        setElectionReceivedId(Integer.parseInt(id));
 
-            SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "ack");
+                        System.out.println(">>> received election messasge" + response.message);
+                        System.out.println(">>> sending messasge to " + response.hostname);
+
+                        SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "ack");
+                    } catch (Exception e) {
+                        System.out.println("[Node] Error on listenElectionMessages thread, " + e.getMessage());
+                    }
+                }
+            });
+
+            this.electionListener.start();
 
         } catch (Exception e) {
             System.out.println("[Node] Error on listenElectionMessages, " + e.getMessage());
@@ -139,9 +174,8 @@ public class Node {
      */
     public int startElection(List<String> lines) {
         System.out.println("> startElection");
-
+        Boolean anyHostAnswered = false;
         try {
-            Boolean anyHostAnswered = false;
             // Get hosts with IDs greater than mine
             ArrayList<String> hosts = new ArrayList<>();
 
@@ -166,6 +200,7 @@ public class Node {
                 SocketHelper.sendMessage(host, Constants.MESSAGE_ELECTION_PORT, message);
                 try {
                     Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, 1000 * 5);
+                    System.out.println("> response received: " + response.message);
 
                     if (response.message != null)
                         anyHostAnswered = true;
@@ -176,15 +211,14 @@ public class Node {
                 }
             }
 
-            if (anyHostAnswered) {
+            if (anyHostAnswered)
                 return 1;
-            }
-
             return 2;
 
         } catch (Exception e) {
-            System.out.println("[Node] Error on startElection. " + e.getMessage());
-            return 0;
+            if (anyHostAnswered)
+                return 1;
+            return 2;
         }
     }
 
