@@ -1,13 +1,8 @@
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.SocketTimeoutException;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 public class Node {
@@ -38,13 +33,6 @@ public class Node {
         this.electionReceivedId = electionReceivedId;
     }
 
-    public void runningThreads() {
-        Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
-        for (Thread t : threadSet) {
-            System.out.println("Thread " + " id: " + t.getId() + " | " + t.getName());
-        }
-    }
-
     public boolean isThreadRunning(String name) {
         Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
         for (Thread t : threadSet) {
@@ -55,7 +43,6 @@ public class Node {
     }
 
     public boolean run() {
-
         // wait for broadcast message from coordinator
         if (this.coordinatorHost == null) {
             try {
@@ -71,7 +58,7 @@ public class Node {
         try {
             this.listenElectionMessages();
         } catch (IOException e) {
-            // TODO: handle exception
+            System.out.println("[Node] Error on listen election messages. " + e.getMessage());
         }
 
         while (true) {
@@ -83,18 +70,16 @@ public class Node {
                 }
 
                 if (this.action == 1) {
-
                     String permission = this.requestPermission("write");
-                    System.out.println(permission);
 
                     if (permission == null)
                         break;
 
                     this.sendWrite();
                     this.action = 0;
+
                 } else {
                     String permission = this.requestPermission("read");
-                    System.out.println(permission);
 
                     if (permission == null)
                         break;
@@ -105,7 +90,7 @@ public class Node {
 
                 TimeUnit.SECONDS.sleep(1);
             } catch (Exception e) {
-                System.out.println("[Node] Error on Node. " + e.getMessage());
+                System.out.println("[Node] " + e.getMessage());
                 break;
             }
         }
@@ -124,22 +109,12 @@ public class Node {
 
     public String receiveBroadcast() throws IOException {
         System.out.println("> receiveBroadcast");
-        DatagramSocket socket = new DatagramSocket(Constants.BROADCAST_PORT);
         try {
-            byte[] receiveData = new byte[16];
-
-            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-
-            socket.receive(receivePacket);
-            String response = new String(receivePacket.getData(), 0, receivePacket.getLength());
-            socket.close();
-
-            return response;
+            Response response = SocketHelper.receiveMessage(Constants.BROADCAST_PORT, 0);
+            return response.message;
         } catch (Exception e) {
             System.out.println("[Node] Error on receiveBroadcast. " + e.getMessage());
             return null;
-        } finally {
-            socket.close();
         }
     }
 
@@ -173,27 +148,10 @@ public class Node {
         }
     }
 
-    public String generateString() {
-        int leftLimit = 97;
-        int rightLimit = 122;
-        int targetStringLength = 10;
-
-        Random random = new Random();
-        StringBuilder buffer = new StringBuilder(targetStringLength);
-
-        for (int i = 0; i < targetStringLength; i++) {
-            int randomLimitedInt = leftLimit + (int) (random.nextFloat() * (rightLimit - leftLimit + 1));
-            buffer.append((char) randomLimitedInt);
-        }
-
-        String str = buffer.toString();
-        return str;
-    }
-
     public void sendWrite() throws IOException, SocketTimeoutException {
         System.out.println("> sendWrite");
         try {
-            String message = "write " + generateString();
+            String message = "write " + StringGenerator.generate();
             SocketHelper.sendMessage(Constants.ARCHIVE_HOST, Constants.ARCHIVE_PORT, message);
 
         } catch (Exception e) {
@@ -216,7 +174,6 @@ public class Node {
         System.out.println("> listenElectionMessages");
 
         if (isThreadRunning("ElectionListener")) {
-            System.out.println("> Election listener alive !!!");
             return;
         }
 
@@ -225,15 +182,10 @@ public class Node {
                 @Override
                 public void run() {
                     try {
-                        System.out.println("> start thread");
                         Response response = SocketHelper.receiveMessage(Constants.MESSAGE_ELECTION_PORT, 0);
                         String id = response.message.split(" ", 2)[1];
                         setElectionStarted(true);
                         setElectionReceivedId(Integer.parseInt(id));
-
-                        System.out.println(">>> received election messasge " + response.message);
-                        System.out.println(">>> sending messasge to " + response.hostname);
-
                         SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "ack");
                     } catch (Exception e) {
                         System.out.println("[Node] Error on listenElectionMessages thread, " + e.getMessage());
@@ -284,7 +236,6 @@ public class Node {
                 SocketHelper.sendMessage(host, Constants.MESSAGE_ELECTION_PORT, message);
                 try {
                     Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, Constants.TIMOUT);
-                    System.out.println("> response received: " + response.message);
 
                     if (response.message != null) {
                         anyHostAnswered = true;

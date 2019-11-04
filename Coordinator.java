@@ -38,7 +38,7 @@ public class Coordinator {
 
     public void broadcast() throws IOException {
         System.out.println("> broadcast");
-        InetAddress address = InetAddress.getByName("255.255.255.255");
+        InetAddress address = InetAddress.getByName(Constants.BROADCAST_HOST);
         DatagramSocket socket = new DatagramSocket();
         socket.setBroadcast(true);
 
