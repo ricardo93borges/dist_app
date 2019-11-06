@@ -8,6 +8,8 @@ import java.util.concurrent.TimeUnit;
 public class Node {
 
     int id;
+    String host;
+    String port;
     String coordinatorHost;
     boolean electionStarted;
     int electionReceivedId;
@@ -15,8 +17,10 @@ public class Node {
     List<String> lines;
     int action;
 
-    public Node(int id, String coordinatorHost, List<String> lines) {
+    public Node(int id, String host, String port, String coordinatorHost, List<String> lines) {
         this.id = id;
+        this.host = host;
+        this.port = port;
         this.coordinatorHost = coordinatorHost;
         this.electionStarted = false;
         this.electionReceivedId = 0;

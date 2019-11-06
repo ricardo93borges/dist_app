@@ -19,7 +19,12 @@ public class Main {
 
         List<String> lines = FileHelper.read(filename);
 
-        int id = Integer.parseInt(lines.get(line).split(" ", 3)[0]);
+        String[] data = lines.get(line).split(" ", 3);
+
+        int id = Integer.parseInt(data[0]);
+        String host = data[1];
+        String port = data[2];
+
         String[] coordinatorData = getCoordinator(lines);
 
         if (Integer.parseInt(coordinatorData[0]) == id) {
@@ -29,7 +34,7 @@ public class Main {
         } else {
             String coordinatorHost = coordinatorData[1];
             System.out.println("coordinatorHost: " + coordinatorHost);
-            setupNode(coordinatorHost, id, lines);
+            setupNode(coordinatorHost, id, host, port, lines);
         }
     }
 
@@ -38,8 +43,8 @@ public class Main {
         coordinator.run();
     }
 
-    public static void setupNode(String coordinatorHost, int id, List<String> lines) {
-        Node node = new Node(id, coordinatorHost, lines);
+    public static void setupNode(String coordinatorHost, int id, String host, String port, List<String> lines) {
+        Node node = new Node(id, host, port, coordinatorHost, lines);
         node.run();
 
         /**
@@ -52,11 +57,10 @@ public class Main {
         node.electionListener.interrupt();
         node = null;
         if (response == 1) {
-            setupNode(null, id, lines);
+            setupNode(null, id, host, port, lines);
         } else {
             setupCoordinator(id);
         }
-
     }
 
     public static String[] getCoordinator(List<String> lines) {
