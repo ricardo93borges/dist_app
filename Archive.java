@@ -9,16 +9,21 @@ public class Archive {
         while (true) {
             try {
                 Response response = SocketHelper.receiveMessage(Constants.ARCHIVE_PORT, 0);
-                System.out.println("[Archive] receive: " + response.message);
-                String[] message = response.message.split(" ", 2);
+                String[] message = response.message.split(" ", 3);
 
-                System.out.println("message: " + message[0]);
-                if (message[0].equals("write")) {
-                    FileHelper.write(FILENAME, message[1]);
+                int id = Integer.parseInt(message[0]);
+                String command = message[1];
+
+                System.out.println("[Archive] " + id + ":" + response.hostname + " request " + command);
+
+                if (command.equals("write")) {
+                    String content = message[2];
+                    FileHelper.write(FILENAME, content);
                 } else {
-                    System.out.println("read ");
                     List<String> lines = FileHelper.read(FILENAME);
                     String line = lines.get(lines.size() - 1);
+
+                    System.out.println("> send to: " + response.hostname);
                     SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, line);
                 }
 

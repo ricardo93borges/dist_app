@@ -88,6 +88,8 @@ public class Node {
                     this.action = 1;
                 }
 
+                this.sendRelease();
+
                 TimeUnit.SECONDS.sleep(1);
             } catch (Exception e) {
                 System.out.println("[Node] " + e.getMessage());
@@ -151,7 +153,7 @@ public class Node {
     public void sendWrite() throws IOException, SocketTimeoutException {
         System.out.println("> sendWrite");
         try {
-            String message = "write " + StringGenerator.generate();
+            String message = this.id + " write " + StringGenerator.generate();
             SocketHelper.sendMessage(Constants.ARCHIVE_HOST, Constants.ARCHIVE_PORT, message);
 
         } catch (Exception e) {
@@ -162,7 +164,7 @@ public class Node {
     public void sendRead() throws IOException, SocketTimeoutException {
         System.out.println("> sendRead");
         try {
-            SocketHelper.sendMessage(Constants.ARCHIVE_HOST, Constants.ARCHIVE_PORT, "read");
+            SocketHelper.sendMessage(Constants.ARCHIVE_HOST, Constants.ARCHIVE_PORT, this.id + " read");
             Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, 0);
             System.out.println("[Node] read line: " + response.message);
         } catch (Exception e) {

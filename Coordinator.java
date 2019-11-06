@@ -5,7 +5,7 @@ import java.net.InetAddress;
 
 public class Coordinator {
 
-    static boolean writing = false;
+    boolean writing = false;
 
     int id;
 
@@ -61,15 +61,21 @@ public class Coordinator {
         try {
             while (true) {
                 Response response = SocketHelper.receiveMessage(Constants.COORD_PORT, 0);
-                System.out.println("response: " + response.message);
 
+                String r = "granted";
                 if (response.message.equals("write") || response.message.equals("read")) {
-                    if (writing) {
+                    if (this.writing) {
+                        r = "denied";
                         SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "denied");
                     } else {
                         SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "granted");
                     }
+                } else if (response.message.equals("release")) {
+                    this.writing = false;
                 }
+
+                System.out
+                        .println("> host " + response.hostname + " request " + response.message + ", response = " + r);
             }
 
         } catch (Exception e) {
