@@ -14,16 +14,15 @@ public class Archive {
                 int id = Integer.parseInt(message[0]);
                 String command = message[1];
 
-                System.out.println("[Archive] " + id + ":" + response.hostname + " request " + command);
+                System.out.println("[Archive] " + response.hostname + " request " + command);
 
                 if (command.equals("write")) {
                     String content = message[2];
                     FileHelper.write(FILENAME, content);
+                    SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "ack");
                 } else {
                     List<String> lines = FileHelper.read(FILENAME);
                     String line = lines.get(lines.size() - 1);
-
-                    System.out.println("> send to: " + response.hostname);
                     SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, line);
                 }
 

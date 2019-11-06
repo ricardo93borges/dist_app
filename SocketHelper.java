@@ -7,6 +7,15 @@ import java.net.UnknownHostException;
 
 public class SocketHelper {
 
+    /**
+     * Send message via socket
+     * 
+     * @param String host
+     * @param int    port
+     * @param String message
+     * @throws UnknownHostException
+     * @throws SocketException
+     */
     public static void sendMessage(String host, int port, String message) throws UnknownHostException, SocketException {
         InetAddress address = InetAddress.getByName(host);
         DatagramSocket socket = new DatagramSocket();
@@ -24,6 +33,14 @@ public class SocketHelper {
         }
     }
 
+    /**
+     * Receive message via socket
+     * 
+     * @param port
+     * @param timeout
+     * @return Response
+     * @throws IOException
+     */
     public static Response receiveMessage(int port, int timeout) throws IOException {
         DatagramSocket socket = new DatagramSocket(port);
         socket.setSoTimeout(timeout);

@@ -36,8 +36,13 @@ public class Coordinator {
         return false;
     }
 
+    /**
+     * Send broadcast message
+     * 
+     * @throws IOException
+     */
     public void broadcast() throws IOException {
-        System.out.println("> broadcast");
+        System.out.println("[Coordinator] Broadcast");
         InetAddress address = InetAddress.getByName(Constants.BROADCAST_HOST);
         DatagramSocket socket = new DatagramSocket();
         socket.setBroadcast(true);
@@ -56,8 +61,13 @@ public class Coordinator {
         }
     }
 
+    /**
+     * Receive messages
+     * 
+     * @throws IOException
+     */
     public void receiveRequests() throws IOException {
-        System.out.println("> receiveRequests");
+        System.out.println("[Coordinator] Ready to receive requests");
         try {
             while (true) {
                 Response response = SocketHelper.receiveMessage(Constants.COORD_PORT, 0);
@@ -68,6 +78,7 @@ public class Coordinator {
                         r = "denied";
                         SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "denied");
                     } else {
+                        this.writing = true;
                         SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "granted");
                     }
                 } else if (response.message.equals("release")) {
@@ -79,7 +90,7 @@ public class Coordinator {
             }
 
         } catch (Exception e) {
-            System.out.println("Error on receiveRequests. " + e.getMessage());
+            System.out.println("[Coordinator] Error on receiveRequests. " + e.getMessage());
         }
     }
 

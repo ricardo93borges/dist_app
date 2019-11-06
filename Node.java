@@ -7,6 +7,10 @@ import java.util.concurrent.TimeUnit;
 
 public class Node {
 
+    private static final String WRITE = "write";
+    private static final String READ = "read";
+    private static final String ELECTION = "election";
+
     int id;
     String host;
     String port;
@@ -47,11 +51,10 @@ public class Node {
     }
 
     public boolean run() {
-        // wait for broadcast message from coordinator
         if (this.coordinatorHost == null) {
+            // wait for broadcast message from coordinator
             try {
                 String response = this.receiveBroadcast();
-                System.out.println("[Node] Res. " + response);
                 String id = response.split(" ", 2)[1];
                 this.coordinatorHost = this.getHostById(Integer.parseInt(id));
             } catch (IOException e) {
@@ -67,14 +70,13 @@ public class Node {
 
         while (true) {
             try {
-
                 if (this.electionStarted) {
                     System.out.println("> Election started ");
                     break;
                 }
 
                 if (this.action == 1) {
-                    String permission = this.requestPermission("write");
+                    String permission = this.requestPermission(WRITE);
 
                     if (permission == null)
                         break;
@@ -83,7 +85,7 @@ public class Node {
                     this.action = 0;
 
                 } else {
-                    String permission = this.requestPermission("read");
+                    String permission = this.requestPermission(READ);
 
                     if (permission == null)
                         break;
@@ -104,6 +106,12 @@ public class Node {
         return false;
     }
 
+    /**
+     * Get host from config file by id
+     * 
+     * @param id
+     * @return String host
+     */
     public String getHostById(int id) {
         for (String line : this.lines) {
             String[] data = line.split(" ", 3);
@@ -113,10 +121,16 @@ public class Node {
         return null;
     }
 
+    /**
+     * Receive broadcast message from coordinator
+     * 
+     * @return String message
+     * @throws IOException
+     */
     public String receiveBroadcast() throws IOException {
-        System.out.println("> receiveBroadcast");
         try {
             Response response = SocketHelper.receiveMessage(Constants.BROADCAST_PORT, 0);
+            System.out.println("[Node] Broadcast message received: " + response.message);
             return response.message;
         } catch (Exception e) {
             System.out.println("[Node] Error on receiveBroadcast. " + e.getMessage());
@@ -127,15 +141,18 @@ public class Node {
     /**
      * Request permission to coordinator
      * 
-     * @type (write | read)
+     * @param type (write or read)
+     * @return String message (granted or denied)
+     * @throws IOException
+     * @throws SocketTimeoutException
      */
     public String requestPermission(String type) throws IOException, SocketTimeoutException {
-        System.out.println("> requestPermission to " + this.coordinatorHost);
+        System.out.println("[Node] Request permission for " + type + " to " + this.coordinatorHost);
         try {
             SocketHelper.sendMessage(this.coordinatorHost, Constants.COORD_PORT, type);
 
             Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, Constants.TIMOUT);
-            System.out.println("Response received: " + response.message);
+            System.out.println("[Node] Permission: " + response.message);
 
             return response.message;
 
@@ -145,8 +162,14 @@ public class Node {
         }
     }
 
+    /**
+     * Send release message to coordinator
+     * 
+     * @throws IOException
+     * @throws SocketTimeoutException
+     */
     public void sendRelease() throws IOException, SocketTimeoutException {
-        System.out.println("> sendRelease");
+        System.out.println("[Node] Send release");
         try {
             SocketHelper.sendMessage(this.coordinatorHost, Constants.COORD_PORT, "release");
         } catch (Exception e) {
@@ -154,31 +177,47 @@ public class Node {
         }
     }
 
+    /**
+     * Send write message to Archive
+     * 
+     * @throws IOException
+     * @throws SocketTimeoutException
+     */
     public void sendWrite() throws IOException, SocketTimeoutException {
-        System.out.println("> sendWrite");
+        System.out.println("[Node] Send " + WRITE);
         try {
-            String message = this.id + " write " + StringGenerator.generate();
+            String message = this.id + " " + WRITE + " " + StringGenerator.generate();
             SocketHelper.sendMessage(Constants.ARCHIVE_HOST, Constants.ARCHIVE_PORT, message);
+            SocketHelper.receiveMessage(Constants.MESSAGE_PORT, 0);
 
         } catch (Exception e) {
             System.out.println("[Node] Error on sendWrite, " + e.getMessage());
         }
     }
 
+    /**
+     * Send read message to Archive
+     * 
+     * @throws IOException
+     * @throws SocketTimeoutException
+     */
     public void sendRead() throws IOException, SocketTimeoutException {
-        System.out.println("> sendRead");
+        System.out.println("[Node] Send " + READ);
         try {
-            SocketHelper.sendMessage(Constants.ARCHIVE_HOST, Constants.ARCHIVE_PORT, this.id + " read");
+            SocketHelper.sendMessage(Constants.ARCHIVE_HOST, Constants.ARCHIVE_PORT, this.id + " " + READ);
             Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, 0);
-            System.out.println("[Node] read line: " + response.message);
+            System.out.println("[Node] line received: " + response.message);
         } catch (Exception e) {
             System.out.println("[Node] Error on sendRead, " + e.getMessage());
         }
     }
 
+    /**
+     * Listend to election messages
+     * 
+     * @throws IOException
+     */
     public void listenElectionMessages() throws IOException {
-        System.out.println("> listenElectionMessages");
-
         if (isThreadRunning("ElectionListener")) {
             return;
         }
@@ -208,14 +247,13 @@ public class Node {
     }
 
     /**
-     * 2 = this is the new coordinator, 1 = another node is the new coordinator
+     * Start election
      * 
-     * @param lines
-     * @return int
-     * 
+     * @param List<String> lines
+     * @return int (2 = this is the new coordinator, 1 = another node is)
      */
     public int startElection(List<String> lines) {
-        System.out.println("> startElection");
+        System.out.println("[Node] Start election");
         Boolean anyHostAnswered = false;
         try {
             // Get hosts with IDs greater than mine
@@ -237,7 +275,7 @@ public class Node {
 
             for (int i = 0; i < hosts.size(); i++) {
                 // Send election message
-                String message = "election " + this.id;
+                String message = ELECTION + " " + this.id;
                 String host = hosts.get(i);
                 SocketHelper.sendMessage(host, Constants.MESSAGE_ELECTION_PORT, message);
                 try {

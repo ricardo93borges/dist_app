@@ -10,6 +10,12 @@ import java.util.stream.Stream;
 
 public class FileHelper {
 
+    /**
+     * Read line from a file
+     * 
+     * @param filename
+     * @return List<String>
+     */
     public static List<String> read(String filename) {
         List<String> result;
         try (Stream<String> lines = Files.lines(Paths.get(filename))) {
@@ -21,6 +27,12 @@ public class FileHelper {
         }
     }
 
+    /**
+     * Write line in a file
+     * 
+     * @param filename
+     * @param context
+     */
     public static void write(String filename, String content) {
         try (FileWriter writer = new FileWriter(filename, true); BufferedWriter bw = new BufferedWriter(writer)) {
             bw.write(content);
