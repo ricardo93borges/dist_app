@@ -18,10 +18,12 @@ public class Node {
     boolean electionStarted;
     int electionReceivedId;
     Thread electionListener;
+    Thread broadcastListener;
     List<String> lines;
     int action;
+    String role;// reader | writer
 
-    public Node(int id, String host, String port, String coordinatorHost, List<String> lines) {
+    public Node(int id, String host, String port, String coordinatorHost, List<String> lines, String role) {
         this.id = id;
         this.host = host;
         this.port = port;
@@ -29,8 +31,10 @@ public class Node {
         this.electionStarted = false;
         this.electionReceivedId = 0;
         this.electionListener = new Thread();
+        this.broadcastListener = new Thread();
         this.lines = lines;
         this.action = 1;
+        this.role = role;
     }
 
     public void setElectionStarted(boolean electionStarted) {
@@ -39,6 +43,11 @@ public class Node {
 
     public void setElectionReceivedId(int electionReceivedId) {
         this.electionReceivedId = electionReceivedId;
+    }
+
+    public void setCoordinatorHost(String coordinatorHost) {
+        this.coordinatorHost = coordinatorHost;
+        System.out.println("> setCoordinatorHost " + this.coordinatorHost);
     }
 
     public boolean isThreadRunning(String name) {
@@ -51,15 +60,25 @@ public class Node {
     }
 
     public boolean run() {
-        if (this.coordinatorHost == null) {
+        /*
+         * if (this.coordinatorHost == null) { try { this.receiveBroadcast(); } catch
+         * (IOException e) { System.out.println("[Node] Error on Node. " +
+         * e.getMessage()); } }
+         */
+        try {
+            this.listenBroadcastMessages(this);
+        } catch (IOException e) {
+            System.out.println("[Node] Error on listen broadcast messages. " + e.getMessage());
+        }
+
+        try {
             // wait for broadcast message from coordinator
-            try {
-                String response = this.receiveBroadcast();
-                String id = response.split(" ", 2)[1];
-                this.coordinatorHost = this.getHostById(Integer.parseInt(id));
-            } catch (IOException e) {
-                System.out.println("[Node] Error on Node. " + e.getMessage());
+            while (this.coordinatorHost == null) {
+                System.out.println("[Node] coordinatorHost is not defined " + this.coordinatorHost);
+                TimeUnit.SECONDS.sleep(3);
             }
+        } catch (InterruptedException e) {
+            System.out.println("[Node] Error on wait coordinator host. " + e.getMessage());
         }
 
         try {
@@ -75,26 +94,43 @@ public class Node {
                     break;
                 }
 
-                if (this.action == 1) {
-                    String permission = this.requestPermission(WRITE);
+                if (this.role.equals("writer")) {
+                    String permission = this.requestPermission(WRITE, null);
 
                     if (permission == null)
                         break;
 
-                    this.sendWrite();
-                    this.action = 0;
+                    String[] splitted = permission.split(" ");
+                    String message = splitted[0];
+                    String token = null;
 
-                } else {
-                    String permission = this.requestPermission(READ);
+                    if (splitted.length == 2) {
+                        token = splitted[1];
+                    }
+
+                    while (!message.equals("granted")) {
+                        permission = this.requestPermission(WRITE, token);
+                        splitted = permission.split(" ");
+                        message = splitted[0];
+                        TimeUnit.SECONDS.sleep(1);
+                    }
+
+                    if (permission.equals("granted")) {
+                        // this.sendWrite();
+                        this.sendRelease(WRITE);
+                    }
+
+                } else if (this.role.equals("reader")) {
+                    String permission = this.requestPermission(READ, null);
 
                     if (permission == null)
                         break;
 
-                    this.sendRead();
-                    this.action = 1;
+                    if (permission.equals("granted")) {
+                        // this.sendRead();
+                        this.sendRelease(READ);
+                    }
                 }
-
-                this.sendRelease();
 
                 TimeUnit.SECONDS.sleep(1);
             } catch (Exception e) {
@@ -127,11 +163,18 @@ public class Node {
      * @return String message
      * @throws IOException
      */
-    public String receiveBroadcast() throws IOException {
+    public String receiveBroadcast(Node self) throws IOException {
+        System.out.println("[Node] > receiveBroadcast");
         try {
             Response response = SocketHelper.receiveMessage(Constants.BROADCAST_PORT, 0);
+            String id = response.message.split(" ", 2)[1];
+            String coordinatorHost = this.getHostById(Integer.parseInt(id));
+            self.setCoordinatorHost(coordinatorHost);
+
             System.out.println("[Node] Broadcast message received: " + response.message);
+            System.out.println("[Node] Coordinator host: " + this.coordinatorHost);
             return response.message;
+
         } catch (Exception e) {
             System.out.println("[Node] Error on receiveBroadcast. " + e.getMessage());
             return null;
@@ -146,10 +189,17 @@ public class Node {
      * @throws IOException
      * @throws SocketTimeoutException
      */
-    public String requestPermission(String type) throws IOException, SocketTimeoutException {
+    public String requestPermission(String type, String token) throws IOException, SocketTimeoutException {
         System.out.println("[Node] Request permission for " + type + " to " + this.coordinatorHost);
+        System.out.println("[Node] " + token);
+
         try {
-            SocketHelper.sendMessage(this.coordinatorHost, Constants.COORD_PORT, type);
+            String message = type;
+            if (token != null) {
+                message += " " + token;
+            }
+
+            SocketHelper.sendMessage(this.coordinatorHost, Constants.COORD_PORT, message);
 
             Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, Constants.TIMOUT);
             System.out.println("[Node] Permission: " + response.message);
@@ -168,10 +218,10 @@ public class Node {
      * @throws IOException
      * @throws SocketTimeoutException
      */
-    public void sendRelease() throws IOException, SocketTimeoutException {
+    public void sendRelease(String type) throws IOException, SocketTimeoutException {
         System.out.println("[Node] Send release");
         try {
-            SocketHelper.sendMessage(this.coordinatorHost, Constants.COORD_PORT, "release");
+            SocketHelper.sendMessage(this.coordinatorHost, Constants.COORD_PORT, "release " + type);
         } catch (Exception e) {
             System.out.println("[Node] Error on sendRelease, " + e.getMessage());
         }
@@ -243,6 +293,39 @@ public class Node {
 
         } catch (Exception e) {
             System.out.println("[Node] Error on listenElectionMessages, " + e.getMessage());
+        }
+    }
+
+    /**
+     * Listend to broadcast messages
+     * 
+     * @throws IOException
+     */
+    public void listenBroadcastMessages(Node self) throws IOException {
+        if (isThreadRunning("BroadcastListener")) {
+            return;
+        }
+
+        try {
+            this.broadcastListener = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        System.out.println("[Node] >>> listenBroadcastMessages thread started <<<");
+                        while (true) {
+                            receiveBroadcast(self);
+                        }
+                    } catch (Exception e) {
+                        System.out.println("[Node] Error on listenBroadcastMessages thread, " + e.getMessage());
+                    }
+                }
+            });
+
+            this.broadcastListener.setName("BroadcastListener");
+            this.broadcastListener.start();
+
+        } catch (Exception e) {
+            System.out.println("[Node] Error on listenBroadcastMessages, " + e.getMessage());
         }
     }
 

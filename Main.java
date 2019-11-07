@@ -16,6 +16,10 @@ public class Main {
 
         String filename = args[0];
         int line = Integer.parseInt(args[1]);
+        String role = null;
+        if (args.length == 3) {
+            role = args[2];
+        }
 
         List<String> lines = FileHelper.read(filename);
 
@@ -29,22 +33,23 @@ public class Main {
 
         if (Integer.parseInt(coordinatorData[0]) == id) {
             System.out.println("> is coordinator");
-            setupCoordinator(id);
+            setupCoordinator(id, lines);
 
         } else {
             String coordinatorHost = coordinatorData[1];
             System.out.println("coordinatorHost: " + coordinatorHost);
-            setupNode(coordinatorHost, id, host, port, lines);
+            setupNode(coordinatorHost, id, host, port, lines, role);
         }
     }
 
-    public static void setupCoordinator(int id) {
-        Coordinator coordinator = new Coordinator(id);
+    public static void setupCoordinator(int id, List<String> lines) {
+        Coordinator coordinator = new Coordinator(id, lines);
         coordinator.run();
     }
 
-    public static void setupNode(String coordinatorHost, int id, String host, String port, List<String> lines) {
-        Node node = new Node(id, host, port, coordinatorHost, lines);
+    public static void setupNode(String coordinatorHost, int id, String host, String port, List<String> lines,
+            String role) {
+        Node node = new Node(id, host, port, coordinatorHost, lines, role);
         node.run();
 
         /**
@@ -54,12 +59,11 @@ public class Main {
          */
 
         int response = node.startElection(lines);
-        node.electionListener.interrupt();
         node = null;
         if (response == 1) {
-            setupNode(null, id, host, port, lines);
+            setupNode(null, id, host, port, lines, role);
         } else {
-            setupCoordinator(id);
+            setupCoordinator(id, lines);
         }
     }
 
