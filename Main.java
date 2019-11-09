@@ -33,8 +33,9 @@ public class Main {
 
         } else {
             String coordinatorHost = coordinatorData[1];
+            int coordinatorPort = Integer.parseInt(coordinatorData[2]);
             System.out.println("coordinatorHost: " + coordinatorHost);
-            setupNode(coordinatorHost, id, host, port, lines);
+            setupNode(coordinatorHost, coordinatorPort, id, host, Integer.parseInt(port), lines);
         }
     }
 
@@ -43,8 +44,9 @@ public class Main {
         coordinator.run();
     }
 
-    public static void setupNode(String coordinatorHost, int id, String host, String port, List<String> lines) {
-        Node node = new Node(id, host, port, coordinatorHost, lines);
+    public static void setupNode(String coordinatorHost, int coordinatorPort, int id, String host, int port,
+            List<String> lines) {
+        Node node = new Node(id, host, port, coordinatorHost, coordinatorPort, lines);
         node.run();
 
         /**
@@ -57,7 +59,7 @@ public class Main {
         node.electionListener.interrupt();
         node = null;
         if (response == 1) {
-            setupNode(null, id, host, port, lines);
+            setupNode(null, 0, id, host, port, lines);
         } else {
             setupCoordinator(id);
         }

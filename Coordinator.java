@@ -2,19 +2,34 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
 
 public class Coordinator {
 
-    boolean writing = false;
+    // boolean writing = false;
+
+    // number of customers waiting
+    int customers = 0;
+
+    // seats available for hair cutting
+    int seats = 1;
+
+    // barber is idle or working
+    int barber = 0;
+
+    // Customers queue
+    ArrayBlockingQueue<Response> queue = new ArrayBlockingQueue<Response>(Constants.MAX_CHAIRS);
 
     int id;
+    int port;
 
     public Coordinator(int id) {
         this.id = id;
+        this.port = 0;
     }
 
     public boolean run() {
-
         try {
             // Tell the other I'm the coordnator
             this.broadcast();
@@ -70,28 +85,49 @@ public class Coordinator {
         System.out.println("[Coordinator] Ready to receive requests");
         try {
             while (true) {
-                Response response = SocketHelper.receiveMessage(Constants.COORD_PORT, 0);
+                if (this.customers > 0 && this.seats == 1) {
 
-                String r = "granted";
-                if (response.message.equals("write") || response.message.equals("read")) {
-                    if (this.writing) {
-                        r = "denied";
-                        SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "denied");
-                    } else {
-                        this.writing = true;
-                        SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "granted");
-                    }
-                } else if (response.message.equals("release")) {
-                    this.writing = false;
+                    this.barber++;
+                    this.seats--;
+
+                    Response response = this.queue.poll();
+                    int port = this.getPortById(response.message);
+                    SocketHelper.sendMessage(response.hostname, port, "done");
+
+                    this.customers--;
+                    this.barber--;
+                    this.seats++;
                 }
 
-                System.out
-                        .println("> host " + response.hostname + " request " + response.message + ", response = " + r);
+                Response response = SocketHelper.receiveMessage(Constants.COORD_PORT, 0);
+                System.out.println("Received: " + response.message);
+
+                if (this.customers == Constants.MAX_CHAIRS) {
+                    SocketHelper.sendMessage(response.hostname, response.port, "denied");
+                } else {
+                    this.customers++;
+                    this.queue.add(response);
+                }
+
+                // System.out.println("barber: " + this.barber);
+                // System.out.println("seats: " + this.seats);
+                // System.out.println("customers: " + this.customers);
             }
 
         } catch (Exception e) {
             System.out.println("[Coordinator] Error on receiveRequests. " + e.getMessage());
         }
+    }
+
+    public int getPortById(String id) {
+        List<String> lines = FileHelper.read("config.txt");
+
+        for (String line : lines) {
+            String[] data = line.split(" ", 3);
+            if (data[0].equals(id))
+                return Integer.parseInt(data[2]);
+        }
+        return 0;
     }
 
 }

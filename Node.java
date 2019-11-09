@@ -13,19 +13,21 @@ public class Node {
 
     int id;
     String host;
-    String port;
+    int port;
     String coordinatorHost;
+    int coordinatorPort;
     boolean electionStarted;
     int electionReceivedId;
     Thread electionListener;
     List<String> lines;
     int action;
 
-    public Node(int id, String host, String port, String coordinatorHost, List<String> lines) {
+    public Node(int id, String host, int port, String coordinatorHost, int coordinatorPort, List<String> lines) {
         this.id = id;
         this.host = host;
         this.port = port;
         this.coordinatorHost = coordinatorHost;
+        this.coordinatorPort = coordinatorPort;
         this.electionStarted = false;
         this.electionReceivedId = 0;
         this.electionListener = new Thread();
@@ -75,26 +77,13 @@ public class Node {
                     break;
                 }
 
-                if (this.action == 1) {
-                    String permission = this.requestPermission(WRITE);
+                String permission = this.requestPermission(WRITE);
 
-                    if (permission == null)
-                        break;
-
-                    this.sendWrite();
-                    this.action = 0;
-
-                } else {
-                    String permission = this.requestPermission(READ);
-
-                    if (permission == null)
-                        break;
-
-                    this.sendRead();
-                    this.action = 1;
-                }
-
-                this.sendRelease();
+                /*
+                 * if (permission.equals("denied")) {
+                 * System.out.println("[Node] Wait room full"); } else if
+                 * (permission.equals("done")) { System.out.println("[Node] got haircut"); }
+                 */
 
                 TimeUnit.SECONDS.sleep(1);
             } catch (Exception e) {
@@ -149,9 +138,9 @@ public class Node {
     public String requestPermission(String type) throws IOException, SocketTimeoutException {
         System.out.println("[Node] Request permission for " + type + " to " + this.coordinatorHost);
         try {
-            SocketHelper.sendMessage(this.coordinatorHost, Constants.COORD_PORT, type);
+            SocketHelper.sendMessage(this.coordinatorHost, Constants.COORD_PORT, Integer.toString(this.id));
 
-            Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, Constants.TIMOUT);
+            Response response = SocketHelper.receiveMessage(this.port, Constants.TIMOUT);
             System.out.println("[Node] Permission: " + response.message);
 
             return response.message;
@@ -231,7 +220,7 @@ public class Node {
                         String id = response.message.split(" ", 2)[1];
                         setElectionStarted(true);
                         setElectionReceivedId(Integer.parseInt(id));
-                        SocketHelper.sendMessage(response.hostname, Constants.MESSAGE_PORT, "ack");
+                        SocketHelper.sendMessage(response.hostname, getPortById(id), "ack");
                     } catch (Exception e) {
                         System.out.println("[Node] Error on listenElectionMessages thread, " + e.getMessage());
                     }
@@ -301,5 +290,14 @@ public class Node {
                 return 1;
             return 2;
         }
+    }
+
+    public int getPortById(String id) {
+        for (String line : this.lines) {
+            String[] data = line.split(" ", 3);
+            if (data[0].equals(id))
+                return Integer.parseInt(data[2]);
+        }
+        return 0;
     }
 }

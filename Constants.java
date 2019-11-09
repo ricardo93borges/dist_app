@@ -7,4 +7,5 @@ public class Constants {
     public static final String BROADCAST_HOST = "255.255.255.255";
     public static final int TIMOUT = 1000 * 10;
     public static final String ARCHIVE_HOST = "172.16.14.62";
+    public static final int MAX_CHAIRS = 1;
 }

@@ -20,9 +20,12 @@ public class SocketHelper {
         InetAddress address = InetAddress.getByName(host);
         DatagramSocket socket = new DatagramSocket();
 
+        System.out.println("[] Send to " + host + ":" + port);
+
         try {
             byte[] buffer = message.getBytes();
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, port);
+
             socket.send(packet);
             socket.close();
         } catch (IOException e) {
@@ -52,9 +55,10 @@ public class SocketHelper {
             socket.receive(receivePacket);
             String message = new String(receivePacket.getData(), 0, receivePacket.getLength());
             String hostname = receivePacket.getAddress().getHostName();
+            int messagePort = receivePacket.getPort();
             socket.close();
 
-            return new Response(message, hostname);
+            return new Response(message, hostname, messagePort);
 
         } catch (IOException e) {
             System.out.println("[SocketHelper] Error on receiveMessage. " + e.getMessage());
