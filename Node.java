@@ -87,11 +87,10 @@ public class Node {
         }
 
         System.out.println("Coordinator host: " + this.coordinatorHost + ":" + this.coordinatorPort);
-        try {
-            TimeUnit.SECONDS.sleep(2);
-        } catch (InterruptedException e1) {
-            e1.printStackTrace();
-        }
+        /*
+         * try { TimeUnit.SECONDS.sleep(2); } catch (InterruptedException e1) {
+         * e1.printStackTrace(); }
+         */
 
         try {
             this.listenElectionMessages();
@@ -120,7 +119,7 @@ public class Node {
                         break;
                     }
                 }
-                TimeUnit.SECONDS.sleep(2);
+                TimeUnit.SECONDS.sleep(1);
             }
 
             sc.close();

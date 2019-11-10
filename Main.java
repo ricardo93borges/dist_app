@@ -36,7 +36,7 @@ public class Main {
 
         } else {
             System.out.println("coordinatorHost: " + coordinatorHost);
-            setupNode(coordinatorHost, coordinatorPort, id, host, Integer.parseInt(port), lines);
+            setupCustomer(coordinatorHost, coordinatorPort, id, host, Integer.parseInt(port), lines);
         }
     }
 
@@ -45,22 +45,19 @@ public class Main {
         coordinator.run();
     }
 
-    public static void setupNode(String coordinatorHost, int coordinatorPort, int id, String host, int port,
+    public static void setupCustomer(String coordinatorHost, int coordinatorPort, int id, String host, int port,
             List<String> lines) {
-        Node node = new Node(id, host, port, coordinatorHost, coordinatorPort, lines);
-        int response = node.run();
+        Customer customer = new Customer(id, host, port, null, coordinatorHost, coordinatorPort, lines);
+        int response = customer.run();
 
         /**
          * Node's run is a loop that only breaks if coordinator doesn't answer
-         * (timeout), so if the program reach this line it has to start an election or
-         * an election has started
+         * (timeout), so if the program reach this line an election has started
          */
 
-        // int response = node.startElection(lines);
-        // node.electionListener.interrupt();
-        node = null;
+        customer = null;
         if (response == 1) {
-            setupNode(null, 0, id, host, port, lines);
+            setupCustomer(null, 0, id, host, port, lines);
         } else {
             setupCoordinator(id, coordinatorHost, coordinatorPort, lines);
         }

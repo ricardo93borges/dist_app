@@ -40,31 +40,9 @@ public class Coordinator {
     public Coordinator(int id, String host, int port, List<String> lines) {
         this.id = id;
         this.lines = lines;
-        this.port = this.getPortById(id);
-        this.host = this.getHostById(id);
+        this.port = port;
+        this.host = host;
     }
-
-    // public boolean run() {
-    // try {
-    // // Tell the other I'm the coordinator
-    // this.broadcast();
-    // } catch (IOException e) {
-    // System.out.println("Error on Coordinator. " + e.getMessage());
-    // }
-    //
-    // while (true) {
-    // try {
-    // // Wait for requests
-    // this.receiveRequests();
-    //
-    // } catch (Exception e) {
-    // System.out.println("Error on Coordintor. " + e.getMessage());
-    // break;
-    // }
-    // }
-    //
-    // return false;
-    // }
 
     public void upCustomer() {
         this.customers++;
@@ -79,7 +57,17 @@ public class Coordinator {
         return true;
     }
 
+    public String getHost() {
+        return this.host;
+    }
+
+    public int getPort() {
+        return this.port;
+    }
+
     public Boolean run() {
+        this.port = this.getPortById(this.id);
+        this.host = this.getHostById(this.id);
 
         Thread broadcastThread = new Thread(new Runnable() {
             @Override
@@ -119,6 +107,8 @@ public class Coordinator {
                     Customer customer = this.list.get(0);
                     list.remove(0);
 
+                    System.out.println("[Coordinator] barber cutting customer " + customer.id + " hair");
+
                     String msg = "done";
                     ByteBuffer bb = ByteBuffer.wrap(msg.getBytes());
                     customer.sc.write(bb);
@@ -127,13 +117,12 @@ public class Coordinator {
                     this.customers--;
                     this.barber--;
                     this.seats++;
+
+                } else {
+                    System.out.println("[Coordinator] barber sleeping");
+                    TimeUnit.SECONDS.sleep(1);
                 }
 
-                // System.out.println("barber: " + this.barber);
-                // System.out.println("seats: " + this.seats);
-                // System.out.println("customers: " + this.customers);
-
-                TimeUnit.SECONDS.sleep(2);
             }
         } catch (Exception e) {
             System.out.println("[Coordinator] error on process. " + e.getMessage());
@@ -144,11 +133,7 @@ public class Coordinator {
     public void handleConnections() {
         System.out.println("[Coordinator] handleConnections");
         try {
-            // InetAddress host = InetAddress.getByName("localhost");
             Selector selector = Selector.open();
-
-            System.out.println("host: " + this.host);
-            System.out.println("port: " + this.port);
 
             this.serverSocketChannel = ServerSocketChannel.open();
             serverSocketChannel.configureBlocking(false);
@@ -171,7 +156,7 @@ public class Coordinator {
                         SocketChannel sc = serverSocketChannel.accept();
                         sc.configureBlocking(false);
                         sc.register(selector, SelectionKey.OP_READ);
-                        System.out.println("Connected: " + sc.getLocalAddress() + "\n");
+                        System.out.println("[Coordinator] Connected: " + sc.getLocalAddress() + "\n");
                     }
 
                     if (key.isWritable()) {
@@ -179,7 +164,6 @@ public class Coordinator {
                             System.out.println("notify");
                             Customer customer = notifyQueue.poll();
                             String msg = "done";
-                            // SocketChannel sc = (SocketChannel) key.channel();
                             ByteBuffer bb = ByteBuffer.wrap(msg.getBytes());
                             customer.sc.write(bb);
                         }
@@ -191,22 +175,20 @@ public class Coordinator {
                         sc.read(bb);
                         String id = new String(bb.array()).trim();
 
-                        System.out.println("Received: " + id);
+                        System.out.println("[Coordinator] customer " + id + " enters");
 
                         if (customers == MAX_CHAIRS || this.list.size() == MAX_CHAIRS) {
+                            System.out.println("[Coordinator] waiting room is full, come back later");
                             String msg = "full";
                             bb = ByteBuffer.wrap(msg.getBytes());
                             sc.write(bb);
                             bb.clear();
                         } else {
+                            System.out.println("[Coordinator] go to waiting room ");
                             Customer customer = this.getCustomerById(id, sc);
                             if (addCustomerToQueue(customer)) {
                                 upCustomer();
                             }
-                            /*
-                             * String msg = "wait"; bb = ByteBuffer.wrap(msg.getBytes()); sc.write(bb);
-                             * bb.clear();
-                             */
                         }
 
                         if (id.length() <= 0) {
@@ -257,40 +239,6 @@ public class Coordinator {
         }
     }
 
-    /**
-     * Receive messages
-     * 
-     * @throws IOException
-     */
-    /*
-     * public void receiveRequests() throws IOException {
-     * System.out.println("[Coordinator] Ready to receive requests"); try { while
-     * (true) { if (this.customers > 0 && this.seats == 1) {
-     * 
-     * this.barber++; this.seats--;
-     * 
-     * Response response = this.queue.poll(); int port =
-     * this.getPortById(response.message);
-     * SocketHelper.sendMessage(response.hostname, port, "done");
-     * 
-     * this.customers--; this.barber--; this.seats++; }
-     * 
-     * Response response = SocketHelper.receiveMessage(Constants.COORD_PORT, 0);
-     * System.out.println("Received: " + response.message);
-     * 
-     * if (this.customers == Constants.MAX_CHAIRS) {
-     * SocketHelper.sendMessage(response.hostname, response.port, "denied"); } else
-     * { this.customers++; this.queue.add(response); }
-     * 
-     * // System.out.println("barber: " + this.barber); //
-     * System.out.println("seats: " + this.seats); //
-     * System.out.println("customers: " + this.customers); }
-     * 
-     * } catch (Exception e) {
-     * System.out.println("[Coordinator] Error on receiveRequests. " +
-     * e.getMessage()); } }
-     */
-
     public Customer getCustomerById(String id, SocketChannel sc) {
         List<String> lines = FileHelper.read("config.txt");
 
@@ -300,7 +248,7 @@ public class Coordinator {
                 int customerId = Integer.parseInt(id);
                 String host = data[1];
                 int port = Integer.parseInt(data[2]);
-                return new Customer(customerId, host, port, sc);
+                return new Customer(customerId, host, port, sc, this.host, this.port, null);
             }
         }
         return null;
