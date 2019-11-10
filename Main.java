@@ -32,7 +32,7 @@ public class Main {
 
         if (Integer.parseInt(coordinatorData[0]) == id) {
             System.out.println("> is coordinator");
-            setupCoordinator(id, coordinatorHost, coordinatorPort);
+            setupCoordinator(id, coordinatorHost, coordinatorPort, lines);
 
         } else {
             System.out.println("coordinatorHost: " + coordinatorHost);
@@ -40,15 +40,15 @@ public class Main {
         }
     }
 
-    public static void setupCoordinator(int id, String host, int port) {
-        Coordinator coordinator = new Coordinator(id, host, port);
+    public static void setupCoordinator(int id, String host, int port, List<String> lines) {
+        Coordinator coordinator = new Coordinator(id, host, port, lines);
         coordinator.run();
     }
 
     public static void setupNode(String coordinatorHost, int coordinatorPort, int id, String host, int port,
             List<String> lines) {
         Node node = new Node(id, host, port, coordinatorHost, coordinatorPort, lines);
-        node.run();
+        int response = node.run();
 
         /**
          * Node's run is a loop that only breaks if coordinator doesn't answer
@@ -56,13 +56,13 @@ public class Main {
          * an election has started
          */
 
-        int response = node.startElection(lines);
-        node.electionListener.interrupt();
+        // int response = node.startElection(lines);
+        // node.electionListener.interrupt();
         node = null;
         if (response == 1) {
             setupNode(null, 0, id, host, port, lines);
         } else {
-            setupCoordinator(id, coordinatorHost, coordinatorPort);
+            setupCoordinator(id, coordinatorHost, coordinatorPort, lines);
         }
     }
 

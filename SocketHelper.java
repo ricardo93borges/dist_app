@@ -20,7 +20,7 @@ public class SocketHelper {
         InetAddress address = InetAddress.getByName(host);
         DatagramSocket socket = new DatagramSocket();
 
-        System.out.println("[] Send to " + host + ":" + port);
+        System.out.println("[SocketHelper] Send to " + host + ":" + port);
 
         try {
             byte[] buffer = message.getBytes();

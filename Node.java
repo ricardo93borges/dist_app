@@ -1,8 +1,6 @@
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
@@ -59,6 +57,10 @@ public class Node {
         this.electionPort = port;
     }
 
+    public int getId() {
+        return this.id;
+    }
+
     public boolean isThreadRunning(String name) {
         Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
         for (Thread t : threadSet) {
@@ -68,7 +70,7 @@ public class Node {
         return false;
     }
 
-    public boolean run() {
+    public int run() {
         System.out.println("ID: " + this.id);
         System.out.println("Host: " + this.host + ":" + this.port);
 
@@ -78,9 +80,17 @@ public class Node {
                 String response = this.receiveBroadcast();
                 String id = response.split(" ", 2)[1];
                 this.coordinatorHost = this.getHostById(Integer.parseInt(id));
+                this.coordinatorPort = this.getPortById(id);
             } catch (IOException e) {
                 System.out.println("[Node] Error on Node. " + e.getMessage());
             }
+        }
+
+        System.out.println("Coordinator host: " + this.coordinatorHost + ":" + this.coordinatorPort);
+        try {
+            TimeUnit.SECONDS.sleep(2);
+        } catch (InterruptedException e1) {
+            e1.printStackTrace();
         }
 
         try {
@@ -133,7 +143,7 @@ public class Node {
          * System.out.println("[Node] " + e.getMessage()); break; } }
          */
 
-        return false;
+        return this.startElection(lines);
     }
 
     public Boolean process(Set readySet) throws Exception {
@@ -223,8 +233,9 @@ public class Node {
      * @throws IOException
      */
     public String receiveBroadcast() throws IOException {
+        System.out.println("[Node] receiveBroadcast ");
         try {
-            Response response = SocketHelper.receiveMessage(Constants.BROADCAST_PORT, 0);
+            Response response = SocketHelper.receiveMessage(this.port, 0);
             System.out.println("[Node] Broadcast message received: " + response.message);
             return response.message;
         } catch (Exception e) {
@@ -322,21 +333,33 @@ public class Node {
                 @Override
                 public void run() {
                     try {
-                        DatagramSocket socket = SocketHelper.getConnection(Constants.MESSAGE_ELECTION_PORTS, 0);
+                        DatagramSocket socket = null;
+
+                        for (int port : Constants.MESSAGE_ELECTION_PORTS) {
+                            try {
+                                socket = new DatagramSocket(port);
+                                socket.setSoTimeout(0);
+                                setElectionPort(port);
+                                break;
+                            } catch (IOException ex) {
+                                continue; // try next port
+                            }
+                        }
 
                         Response response = SocketHelper.receiveMessage(socket);
                         String id = response.message.split(" ", 2)[1];
 
                         setElectionStarted(true);
                         setElectionReceivedId(Integer.parseInt(id));
-                        setElectionPort(socket.getPort());
 
                         System.out.println("[Node] Election message received " + response.message);
                         int port = getPortById(id);
 
                         System.out.println("[Node] Sending ack to " + response.hostname + ":" + port);
 
-                        SocketHelper.sendMessage(response.hostname, port, "ack");
+                        if (getId() > Integer.parseInt(id))
+                            SocketHelper.sendMessage(response.hostname, port, "ack");
+
                     } catch (IOException e) {
                         System.out.println("[Node] Error on listenElectionMessages thread, " + e.getMessage());
                     }
@@ -378,8 +401,6 @@ public class Node {
                 return 2;
             }
 
-            System.out.println("> election port: " + this.electionPort);
-
             for (int i = 0; i < hosts.size(); i++) {
                 // Send election message
                 String message = ELECTION + " " + this.id;
@@ -391,7 +412,8 @@ public class Node {
                 }
 
                 try {
-                    Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, Constants.TIMOUT);
+                    Response response = SocketHelper.receiveMessage(this.port, Constants.TIMOUT);
+                    System.out.println("[Node] election response received: " + response.message);
 
                     if (response.message != null) {
                         anyHostAnswered = true;
@@ -409,6 +431,7 @@ public class Node {
             return 2;
 
         } catch (Exception e) {
+            System.out.println("[Node] error on election. " + e.getMessage());
             if (anyHostAnswered)
                 return 1;
             return 2;

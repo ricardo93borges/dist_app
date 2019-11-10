@@ -1,9 +1,5 @@
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -39,11 +35,13 @@ public class Coordinator {
     int id;
     int port;
     String host;
+    List<String> lines;
 
-    public Coordinator(int id, String host, int port) {
+    public Coordinator(int id, String host, int port, List<String> lines) {
         this.id = id;
-        this.port = port;
-        this.host = host;
+        this.lines = lines;
+        this.port = this.getPortById(id);
+        this.host = this.getHostById(id);
     }
 
     // public boolean run() {
@@ -82,12 +80,20 @@ public class Coordinator {
     }
 
     public Boolean run() {
-        try {
-            // tell the other I'm the coordinator
-            this.broadcast();
-        } catch (IOException e) {
-            System.out.println("Error on Coordinator. " + e.getMessage());
-        }
+
+        Thread broadcastThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    // tell the other I'm the coordinator
+                    broadcast();
+                } catch (IOException e) {
+                    System.out.println("[Coordinator] error on try broadcast " + e.getMessage());
+                }
+            }
+        });
+        broadcastThread.setName("broadcastThread");
+        broadcastThread.start();
 
         Thread connectionsHandler = new Thread(new Runnable() {
             @Override
@@ -136,6 +142,7 @@ public class Coordinator {
     }
 
     public void handleConnections() {
+        System.out.println("[Coordinator] handleConnections");
         try {
             // InetAddress host = InetAddress.getByName("localhost");
             Selector selector = Selector.open();
@@ -211,12 +218,13 @@ public class Coordinator {
                 }
             }
         } catch (Exception e) {
-            System.out.println("Error on Coordinator. " + e.getMessage());
+            System.out.println("[Coordinator] Error on Coordinator. " + e.getMessage());
         } finally {
             try {
+                System.out.println("[Coordinator] Closing serverSocketChannel ");
                 this.serverSocketChannel.close();
             } catch (IOException e) {
-                System.out.println("Error on close connection " + e.getMessage());
+                System.out.println("[Coordinator] Error on close connection " + e.getMessage());
             }
         }
     }
@@ -228,21 +236,24 @@ public class Coordinator {
      */
     public void broadcast() throws IOException {
         System.out.println("[Coordinator] Broadcast");
-        InetAddress address = InetAddress.getByName(Constants.BROADCAST_HOST);
-        DatagramSocket socket = new DatagramSocket();
-        socket.setBroadcast(true);
 
-        try {
-            String broadcastMessage = "coordinator " + this.id;
-            byte[] buffer = broadcastMessage.getBytes();
+        while (true) {
+            for (int i = 0; i < this.lines.size(); i++) {
+                String[] data = this.lines.get(i).split(" ", 3);
+                int id = Integer.parseInt(data[0]);
 
-            DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, Constants.BROADCAST_PORT);
-            socket.send(packet);
-            socket.close();
+                if (id < this.id) {
+                    String message = "coordinator " + this.id;
+                    SocketHelper.sendMessage(data[1], Integer.parseInt(data[2]), message);
+                }
+            }
 
-        } catch (Exception e) {
-            System.out.println("Error on broadcast. " + e.getMessage());
-            socket.close();
+            try {
+                TimeUnit.SECONDS.sleep(15);
+            } catch (InterruptedException e1) {
+                e1.printStackTrace();
+            }
+
         }
     }
 
@@ -291,6 +302,24 @@ public class Coordinator {
                 int port = Integer.parseInt(data[2]);
                 return new Customer(customerId, host, port, sc);
             }
+        }
+        return null;
+    }
+
+    public int getPortById(int id) {
+        for (String line : this.lines) {
+            String[] data = line.split(" ");
+            if (Integer.parseInt(data[0]) == id)
+                return Integer.parseInt(data[2]);
+        }
+        return 0;
+    }
+
+    public String getHostById(int id) {
+        for (String line : this.lines) {
+            String[] data = line.split(" ");
+            if (Integer.parseInt(data[0]) == id)
+                return data[1];
         }
         return null;
     }
