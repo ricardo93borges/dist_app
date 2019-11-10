@@ -1,6 +1,16 @@
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -11,6 +21,8 @@ public class Node {
     private static final String READ = "read";
     private static final String ELECTION = "election";
 
+    BufferedReader input = null;
+
     int id;
     String host;
     int port;
@@ -18,9 +30,10 @@ public class Node {
     int coordinatorPort;
     boolean electionStarted;
     int electionReceivedId;
+    int electionPort;
     Thread electionListener;
     List<String> lines;
-    int action;
+    boolean waiting = false;
 
     public Node(int id, String host, int port, String coordinatorHost, int coordinatorPort, List<String> lines) {
         this.id = id;
@@ -32,7 +45,6 @@ public class Node {
         this.electionReceivedId = 0;
         this.electionListener = new Thread();
         this.lines = lines;
-        this.action = 1;
     }
 
     public void setElectionStarted(boolean electionStarted) {
@@ -41,6 +53,10 @@ public class Node {
 
     public void setElectionReceivedId(int electionReceivedId) {
         this.electionReceivedId = electionReceivedId;
+    }
+
+    public void setElectionPort(int port) {
+        this.electionPort = port;
     }
 
     public boolean isThreadRunning(String name) {
@@ -53,6 +69,9 @@ public class Node {
     }
 
     public boolean run() {
+        System.out.println("ID: " + this.id);
+        System.out.println("Host: " + this.host + ":" + this.port);
+
         if (this.coordinatorHost == null) {
             // wait for broadcast message from coordinator
             try {
@@ -70,29 +89,116 @@ public class Node {
             System.out.println("[Node] Error on listen election messages. " + e.getMessage());
         }
 
-        while (true) {
-            try {
+        try {
+            InetSocketAddress addr = new InetSocketAddress(this.coordinatorHost, this.coordinatorPort);
+            Selector selector = Selector.open();
+            SocketChannel sc = SocketChannel.open();
+
+            sc.configureBlocking(false);
+            sc.connect(addr);
+            sc.register(selector, SelectionKey.OP_CONNECT | SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+
+            while (true) {
                 if (this.electionStarted) {
                     System.out.println("> Election started ");
                     break;
                 }
 
-                String permission = this.requestPermission(WRITE);
+                if (selector.select() > 0) {
+                    Boolean doneStatus = this.process(selector.selectedKeys());
+                    if (doneStatus) {
+                        break;
+                    }
+                }
+                TimeUnit.SECONDS.sleep(2);
+            }
 
-                /*
-                 * if (permission.equals("denied")) {
-                 * System.out.println("[Node] Wait room full"); } else if
-                 * (permission.equals("done")) { System.out.println("[Node] got haircut"); }
-                 */
+            sc.close();
 
-                TimeUnit.SECONDS.sleep(1);
-            } catch (Exception e) {
-                System.out.println("[Node] " + e.getMessage());
-                break;
+        } catch (Exception e) {
+            System.out.println("[Node] Error: " + e.getMessage());
+        }
+
+        /*
+         * while (true) { try { if (this.electionStarted) {
+         * System.out.println("> Election started "); break; }
+         * 
+         * String permission = this.requestPermission(WRITE);
+         * 
+         * if (permission.equals("denied")) {
+         * System.out.println("[Node] Wait room full"); } else if
+         * (permission.equals("done")) { System.out.println("[Node] got haircut"); }
+         * 
+         * TimeUnit.SECONDS.sleep(1); } catch (Exception e) {
+         * System.out.println("[Node] " + e.getMessage()); break; } }
+         */
+
+        return false;
+    }
+
+    public Boolean process(Set readySet) throws Exception {
+        SelectionKey key = null;
+        Iterator iterator = null;
+        iterator = readySet.iterator();
+
+        while (iterator.hasNext()) {
+            key = (SelectionKey) iterator.next();
+            iterator.remove();
+        }
+
+        if (key.isConnectable()) {
+            Boolean connected = this.handleConnect(key);
+            if (!connected) {
+                return true;
+            }
+        }
+
+        if (key.isReadable()) {
+            SocketChannel sc = (SocketChannel) key.channel();
+            ByteBuffer bb = ByteBuffer.allocate(1024);
+            sc.read(bb);
+
+            String message = new String(bb.array()).trim();
+            System.out.println("[Node] Received: " + message);
+
+            if (message.equals("done")) {
+                this.waiting = false;
+            }
+
+            bb.clear();
+
+            if (message.length() <= 0) {
+                sc.close();
+                System.out.println("Connection closed...");
+            }
+        }
+
+        if (key.isWritable()) {
+            if (!this.waiting) {
+                String msg = Integer.toString(this.id);
+                SocketChannel sc = (SocketChannel) key.channel();
+                ByteBuffer bb = ByteBuffer.wrap(msg.getBytes());
+                sc.write(bb);
+                bb.clear();
+                this.waiting = true;
             }
         }
 
         return false;
+    }
+
+    public Boolean handleConnect(SelectionKey key) {
+        SocketChannel sc = (SocketChannel) key.channel();
+        try {
+            while (sc.isConnectionPending()) {
+                sc.finishConnect();
+            }
+        } catch (IOException e) {
+            key.cancel();
+            e.printStackTrace();
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -216,12 +322,22 @@ public class Node {
                 @Override
                 public void run() {
                     try {
-                        Response response = SocketHelper.receiveMessage(Constants.MESSAGE_ELECTION_PORT, 0);
+                        DatagramSocket socket = SocketHelper.getConnection(Constants.MESSAGE_ELECTION_PORTS, 0);
+
+                        Response response = SocketHelper.receiveMessage(socket);
                         String id = response.message.split(" ", 2)[1];
+
                         setElectionStarted(true);
                         setElectionReceivedId(Integer.parseInt(id));
-                        SocketHelper.sendMessage(response.hostname, getPortById(id), "ack");
-                    } catch (Exception e) {
+                        setElectionPort(socket.getPort());
+
+                        System.out.println("[Node] Election message received " + response.message);
+                        int port = getPortById(id);
+
+                        System.out.println("[Node] Sending ack to " + response.hostname + ":" + port);
+
+                        SocketHelper.sendMessage(response.hostname, port, "ack");
+                    } catch (IOException e) {
                         System.out.println("[Node] Error on listenElectionMessages thread, " + e.getMessage());
                     }
                 }
@@ -262,11 +378,18 @@ public class Node {
                 return 2;
             }
 
+            System.out.println("> election port: " + this.electionPort);
+
             for (int i = 0; i < hosts.size(); i++) {
                 // Send election message
                 String message = ELECTION + " " + this.id;
                 String host = hosts.get(i);
-                SocketHelper.sendMessage(host, Constants.MESSAGE_ELECTION_PORT, message);
+
+                for (int port : Constants.MESSAGE_ELECTION_PORTS) {
+                    if (port != this.electionPort)
+                        SocketHelper.sendMessage(host, port, message);
+                }
+
                 try {
                     Response response = SocketHelper.receiveMessage(Constants.MESSAGE_PORT, Constants.TIMOUT);
 

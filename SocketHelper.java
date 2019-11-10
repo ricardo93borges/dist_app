@@ -68,4 +68,40 @@ public class SocketHelper {
             socket.close();
         }
     }
+
+    public static Response receiveMessage(DatagramSocket socket) throws IOException {
+        try {
+            byte[] receiveData = new byte[16];
+            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+
+            socket.receive(receivePacket);
+            String message = new String(receivePacket.getData(), 0, receivePacket.getLength());
+            String hostname = receivePacket.getAddress().getHostName();
+            int messagePort = receivePacket.getPort();
+            socket.close();
+
+            return new Response(message, hostname, messagePort);
+
+        } catch (IOException e) {
+            System.out.println("[SocketHelper] Error on receiveMessage. " + e.getMessage());
+            socket.close();
+            return null;
+        } finally {
+            socket.close();
+        }
+    }
+
+    public static DatagramSocket getConnection(int[] ports, int timeout) throws IOException {
+        for (int port : ports) {
+            try {
+                DatagramSocket socket = new DatagramSocket(port);
+                socket.setSoTimeout(timeout);
+                System.out.println("[SocketHelper] Port used to listen election messages " + port);
+                return socket;
+            } catch (IOException ex) {
+                continue; // try next port
+            }
+        }
+        throw new IOException("No available port found");
+    }
 }

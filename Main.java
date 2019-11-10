@@ -27,20 +27,21 @@ public class Main {
 
         String[] coordinatorData = getCoordinator(lines);
 
+        String coordinatorHost = coordinatorData[1];
+        int coordinatorPort = Integer.parseInt(coordinatorData[2]);
+
         if (Integer.parseInt(coordinatorData[0]) == id) {
             System.out.println("> is coordinator");
-            setupCoordinator(id);
+            setupCoordinator(id, coordinatorHost, coordinatorPort);
 
         } else {
-            String coordinatorHost = coordinatorData[1];
-            int coordinatorPort = Integer.parseInt(coordinatorData[2]);
             System.out.println("coordinatorHost: " + coordinatorHost);
             setupNode(coordinatorHost, coordinatorPort, id, host, Integer.parseInt(port), lines);
         }
     }
 
-    public static void setupCoordinator(int id) {
-        Coordinator coordinator = new Coordinator(id);
+    public static void setupCoordinator(int id, String host, int port) {
+        Coordinator coordinator = new Coordinator(id, host, port);
         coordinator.run();
     }
 
@@ -61,7 +62,7 @@ public class Main {
         if (response == 1) {
             setupNode(null, 0, id, host, port, lines);
         } else {
-            setupCoordinator(id);
+            setupCoordinator(id, coordinatorHost, coordinatorPort);
         }
     }
 
