@@ -114,10 +114,6 @@ public class Coordinator {
                     customer.sc.write(bb);
                     bb.clear();
 
-                    this.customers--;
-                    this.barber--;
-                    this.seats++;
-
                 } else {
                     System.out.println("[Coordinator] barber sleeping");
                     TimeUnit.SECONDS.sleep(1);
@@ -156,7 +152,7 @@ public class Coordinator {
                         SocketChannel sc = serverSocketChannel.accept();
                         sc.configureBlocking(false);
                         sc.register(selector, SelectionKey.OP_READ);
-                        System.out.println("[Coordinator] Connected: " + sc.getLocalAddress() + "\n");
+                        System.out.println("[Coordinator] Connected: " + sc.getLocalAddress());
                     }
 
                     if (key.isWritable()) {
@@ -173,22 +169,31 @@ public class Coordinator {
                         SocketChannel sc = (SocketChannel) key.channel();
                         ByteBuffer bb = ByteBuffer.allocate(1024);
                         sc.read(bb);
-                        String id = new String(bb.array()).trim();
+                        String[] message = new String(bb.array()).trim().split(" ");
+                        String type = message[0];
+                        String id = message[1];
 
                         System.out.println("[Coordinator] customer " + id + " enters");
 
-                        if (customers == MAX_CHAIRS || this.list.size() == MAX_CHAIRS) {
-                            System.out.println("[Coordinator] waiting room is full, come back later");
-                            String msg = "full";
-                            bb = ByteBuffer.wrap(msg.getBytes());
-                            sc.write(bb);
-                            bb.clear();
-                        } else {
-                            System.out.println("[Coordinator] go to waiting room ");
-                            Customer customer = this.getCustomerById(id, sc);
-                            if (addCustomerToQueue(customer)) {
-                                upCustomer();
+                        if (type.equals("acquire")) {
+                            if (customers == MAX_CHAIRS || this.list.size() == MAX_CHAIRS) {
+                                System.out.println("[Coordinator] waiting room is full, come back later");
+                                /*
+                                 * String msg = "full"; bb = ByteBuffer.wrap(msg.getBytes()); sc.write(bb);
+                                 * bb.clear();
+                                 */
+                            } else {
+                                System.out.println("[Coordinator] go to waiting room ");
+                                Customer customer = this.getCustomerById(id, sc);
+                                if (addCustomerToQueue(customer)) {
+                                    upCustomer();
+                                }
                             }
+                        } else {
+                            // this.removeById(Integer.parseInt(id));
+                            this.customers--;
+                            this.barber--;
+                            this.seats++;
                         }
 
                         if (id.length() <= 0) {
@@ -270,6 +275,22 @@ public class Coordinator {
                 return data[1];
         }
         return null;
+    }
+
+    public void printList() {
+        String msg = "| ";
+        for (Customer c : this.list)
+            msg += c.getId() + " |";
+
+        System.out.println(msg);
+    }
+
+    public void removeById(int id) {
+        for (int i = 0; i < this.list.size() - 1; i++) {
+            if (this.list.get(i).getId() == id) {
+                this.list.remove(i);
+            }
+        }
     }
 
 }

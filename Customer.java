@@ -153,7 +153,13 @@ class Customer {
 
             if (message.equals("done")) {
                 this.waiting = false;
-                TimeUnit.SECONDS.sleep(2);
+
+                String msg = "release " + Integer.toString(this.id);
+                bb = ByteBuffer.wrap(msg.getBytes());
+                sc.write(bb);
+                bb.clear();
+
+                TimeUnit.SECONDS.sleep(1);
             }
 
             bb.clear();
@@ -166,7 +172,7 @@ class Customer {
 
         if (key.isWritable()) {
             if (!this.waiting) {
-                String msg = Integer.toString(this.id);
+                String msg = "acquire " + Integer.toString(this.id);
                 SocketChannel sc = (SocketChannel) key.channel();
                 ByteBuffer bb = ByteBuffer.wrap(msg.getBytes());
                 sc.write(bb);
