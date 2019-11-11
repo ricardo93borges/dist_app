@@ -1,1 +1,1 @@
-javac Constants.java Coordinator.java FileHelper.java Main.java Node.java Response.java SocketHelper.java Archive.java
+javac Constants.java Coordinator.java Customer.java FileHelper.java Main.java Response.java SocketHelper.java

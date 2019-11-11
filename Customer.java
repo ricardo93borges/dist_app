@@ -298,11 +298,13 @@ class Customer {
             for (int i = 0; i < hosts.size(); i++) {
                 // Send election message
                 String message = ELECTION + " " + this.id;
-                String host = hosts.get(i);
+                String hostToSend = hosts.get(i);
 
                 for (int port : Constants.MESSAGE_ELECTION_PORTS) {
-                    if (port != this.electionPort)
-                        SocketHelper.sendMessage(host, port, message);
+                    if (hostToSend.equals(this.host) && port == this.electionPort)
+                        continue;
+
+                    SocketHelper.sendMessage(hostToSend, port, message);
                 }
 
                 try {
