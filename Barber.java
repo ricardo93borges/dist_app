@@ -1,6 +1,5 @@
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 class Barber {
     static String host;
@@ -19,27 +18,35 @@ class Barber {
 
     public static int run() {
 
-        System.out.println("[Baber] host " + host + ":" + port);
-        System.out.println("[Baber] coordinator " + coordinatorHost + ":" + coordinatorPort);
+        System.out.println("[Barber] host " + host + ":" + port);
+
+        // Broadcast thread
+        Thread broadcastThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    while (true) {
+                        String response = receiveBroadcast();
+                        String id = response.split(" ", 2)[1];
+                        Coordinator coordinator = getCoordinatorById(Integer.parseInt(id));
+                        coordinatorHost = coordinator.getHost();
+                        coordinatorPort = coordinator.getPort();
+                        host = coordinatorHost;
+                        System.out.println("[Barber] coordinator " + coordinatorHost + ":" + coordinatorPort);
+                    }
+                } catch (IOException e) {
+                    System.out.println("[Coordinator] error on try broadcast " + e.getMessage());
+                }
+            }
+        });
+        broadcastThread.setName("broadcastThread");
+        broadcastThread.start();
 
         boolean restart = false;
         while (true) {
 
-            if (coordinatorHost == null) {
-                try {
-                    String response = receiveBroadcast();
-                    String id = response.split(" ", 2)[1];
-                    Coordinator coordinator = getCoordinatorById(Integer.parseInt(id));
-                    coordinatorHost = coordinator.getHost();
-                    coordinatorPort = coordinator.getPort();
-                    host = coordinatorHost;
-                } catch (IOException e) {
-                    System.out.println("[Baber] Error on barber " + e.getMessage());
-                }
-            }
-
             try {
-                Response res = SocketHelper.receiveMessage(port, 0);
+                Response res = SocketHelper.receiveMessage(port, Constants.TIMOUT);
 
                 String[] split = res.message.split(" ");
 
@@ -72,8 +79,11 @@ class Barber {
                 if (restart)
                     continue;
 
+            } catch (IOException e) {
+                System.out.println("[Barber] IOException " + e.getMessage());
+                continue;
             } catch (Exception e) {
-                System.out.println("[Baber] error on loop " + e.getMessage());
+                System.out.println("[Barber] error on loop " + e.getMessage());
             }
         }
     }
@@ -83,10 +93,9 @@ class Barber {
             SocketHelper.sendMessage(coordinatorHost, Constants.BARBER_LISTENER_PORT, msg);
             SocketHelper.receiveMessage(Constants.BARBER_PORT, Constants.TIMOUT);
             return false;
-
         } catch (IOException e) {
             System.out.println("[Barber] IOException " + e.getMessage());
-            coordinatorHost = null;
+            // coordinatorHost = null;
             return true;
         }
     }
@@ -100,7 +109,7 @@ class Barber {
     public static String receiveBroadcast() throws IOException {
         System.out.println("[Barber] receiveBroadcast ");
         try {
-            Response response = SocketHelper.receiveMessage(port, 0);
+            Response response = SocketHelper.receiveMessage(Constants.BARBER_BRODCAST_LISTENER_PORT, 0);
             System.out.println("[Barber] Broadcast message received: " + response.message);
             return response.message;
         } catch (Exception e) {

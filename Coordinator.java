@@ -306,7 +306,7 @@ public class Coordinator {
         while (true) {
             try {
                 String message = "coordinator " + this.id;
-                SocketHelper.sendMessage(this.host, Constants.BARBER_PORT, message);
+                SocketHelper.sendMessage(this.host, Constants.BARBER_BRODCAST_LISTENER_PORT, message);
 
                 for (int i = 0; i < this.lines.size(); i++) {
                     String[] data = this.lines.get(i).split(" ", 3);
