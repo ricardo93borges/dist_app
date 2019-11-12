@@ -28,6 +28,7 @@ class Customer {
     Thread electionListener;
     List<String> lines;
     boolean waiting = false;
+    boolean requestSent = true;
 
     public Customer(int id, String host, int port, SocketChannel sc, String coordinatorHost, int coordinatorPort,
             List<String> lines) {
@@ -93,16 +94,24 @@ class Customer {
             System.out.println("[Customer] Error on listen election messages. " + e.getMessage());
         }
 
-        try {
-            InetSocketAddress addr = new InetSocketAddress(this.coordinatorHost, this.coordinatorPort);
-            Selector selector = Selector.open();
-            SocketChannel sc = SocketChannel.open();
+        InetSocketAddress addr = new InetSocketAddress(this.coordinatorHost, this.coordinatorPort);
+        Selector selector = null;
+        SocketChannel sc = null;
 
+        try {
+            selector = Selector.open();
+            sc = SocketChannel.open();
             sc.configureBlocking(false);
             sc.connect(addr);
             sc.register(selector, SelectionKey.OP_CONNECT | SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 
-            while (true) {
+        } catch (IOException e) {
+            System.out.println("[Customer] Error on connect: " + e.getMessage());
+        }
+
+        Response res = null;
+        while (true) {
+            try {
                 if (this.electionStarted) {
                     System.out.println("[Customer] Election started ");
                     break;
@@ -115,21 +124,33 @@ class Customer {
                     }
                 }
 
-                SocketHelper.sendMessage(this.coordinatorHost, this.coordinatorPort, "request " + this.id);
-                Response res = SocketHelper.receiveMessage(this.port, 0);
+                if (this.requestSent) {
+                    res = SocketHelper.receiveMessage(this.port, Constants.TIMOUT);
+                } else {
+                    SocketHelper.sendMessage(this.coordinatorHost, this.coordinatorPort, "request " + this.id);
+                    this.requestSent = true;
+                    res = SocketHelper.receiveMessage(this.port, Constants.TIMOUT);
+                }
+
                 System.out.println("[Customer] received " + res.message);
+                this.requestSent = false;
 
                 if (res.message.equals("granted")) {
                     SocketHelper.sendMessage(this.coordinatorHost, Constants.BARBER_PORT, Integer.toString(this.id));
                 } else {
                     TimeUnit.SECONDS.sleep(3);
                 }
+
+            } catch (Exception e) {
+                System.out.println("[Customer] Error, continue " + e.getMessage());
+                continue;
             }
+        }
 
+        try {
             sc.close();
-
-        } catch (Exception e) {
-            System.out.println("[Customer] Error: " + e.getMessage());
+        } catch (IOException e) {
+            System.out.println("[Customer] Error on close connection: " + e.getMessage());
         }
 
         return this.startElection(lines);
@@ -174,6 +195,7 @@ class Customer {
             if (message.length() <= 0) {
                 sc.close();
                 System.out.println("Connection closed...");
+                setElectionStarted(true);
             }
         }
 
