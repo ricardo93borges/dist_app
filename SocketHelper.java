@@ -59,11 +59,6 @@ public class SocketHelper {
             socket.close();
 
             return new Response(message, hostname, messagePort);
-
-        } catch (IOException e) {
-            System.out.println("[SocketHelper] Error on receiveMessage. " + e.getMessage());
-            socket.close();
-            return null;
         } finally {
             socket.close();
         }

@@ -18,51 +18,76 @@ class Barber {
     }
 
     public static int run() {
-        if (coordinatorHost == null) {
-            // wait for broadcast message from coordinator
-            try {
-                String response = receiveBroadcast();
-                String id = response.split(" ", 2)[1];
-                Coordinator coordinator = getCoordinatorById(Integer.parseInt(id));
-                coordinatorHost = coordinator.getHost();
-                coordinatorPort = coordinator.getPort();
-                host = coordinatorHost;
-            } catch (IOException e) {
-                System.out.println("[Baber] Error on barber " + e.getMessage());
-            }
-        }
 
         System.out.println("[Baber] host " + host + ":" + port);
         System.out.println("[Baber] coordinator " + coordinatorHost + ":" + coordinatorPort);
 
+        boolean restart = false;
         while (true) {
+
+            if (coordinatorHost == null) {
+                try {
+                    String response = receiveBroadcast();
+                    String id = response.split(" ", 2)[1];
+                    Coordinator coordinator = getCoordinatorById(Integer.parseInt(id));
+                    coordinatorHost = coordinator.getHost();
+                    coordinatorPort = coordinator.getPort();
+                    host = coordinatorHost;
+                } catch (IOException e) {
+                    System.out.println("[Baber] Error on barber " + e.getMessage());
+                }
+            }
+
             try {
                 Response res = SocketHelper.receiveMessage(port, 0);
 
-                System.out.println("[Barber] Customer " + res.message + " acquire lock");
+                String[] split = res.message.split(" ");
 
-                SocketHelper.sendMessage(coordinatorHost, Constants.BARBER_LISTENER_PORT, "up barber");
-                SocketHelper.receiveMessage(Constants.BARBER_PORT, 0);
+                if (!split[0].equals("acquier"))
+                    continue;
 
-                SocketHelper.sendMessage(coordinatorHost, Constants.BARBER_LISTENER_PORT, "down seats");
-                SocketHelper.receiveMessage(Constants.BARBER_PORT, 0);
+                String id = split[1];
 
-                TimeUnit.SECONDS.sleep(3);
+                System.out.println("[Barber] Customer " + id + " acquire lock");
 
-                SocketHelper.sendMessage(coordinatorHost, Constants.BARBER_LISTENER_PORT, "down barber");
-                SocketHelper.receiveMessage(Constants.BARBER_PORT, 0);
+                restart = sendMessage("up barber");
+                if (restart)
+                    continue;
 
-                SocketHelper.sendMessage(coordinatorHost, Constants.BARBER_LISTENER_PORT, "up seats");
-                SocketHelper.receiveMessage(Constants.BARBER_PORT, 0);
+                restart = sendMessage("down seats");
+                if (restart)
+                    continue;
 
-                System.out.println("[Barber] Customer " + res.message + " release lock");
+                restart = sendMessage("down barber");
+                if (restart)
+                    continue;
 
-                SocketHelper.sendMessage(coordinatorHost, Constants.BARBER_LISTENER_PORT, "release " + res.message);
-                SocketHelper.receiveMessage(Constants.BARBER_PORT, 0);
+                restart = sendMessage("up seats");
+                if (restart)
+                    continue;
+
+                System.out.println("[Barber] Customer " + id + " release lock");
+
+                restart = sendMessage("release " + id);
+                if (restart)
+                    continue;
 
             } catch (Exception e) {
                 System.out.println("[Baber] error on loop " + e.getMessage());
             }
+        }
+    }
+
+    public static boolean sendMessage(String msg) {
+        try {
+            SocketHelper.sendMessage(coordinatorHost, Constants.BARBER_LISTENER_PORT, msg);
+            SocketHelper.receiveMessage(Constants.BARBER_PORT, Constants.TIMOUT);
+            return false;
+
+        } catch (IOException e) {
+            System.out.println("[Barber] IOException " + e.getMessage());
+            coordinatorHost = null;
+            return true;
         }
     }
 
@@ -73,13 +98,13 @@ class Barber {
      * @throws IOException
      */
     public static String receiveBroadcast() throws IOException {
-        System.out.println("[Customer] receiveBroadcast ");
+        System.out.println("[Barber] receiveBroadcast ");
         try {
             Response response = SocketHelper.receiveMessage(port, 0);
-            System.out.println("[Customer] Broadcast message received: " + response.message);
+            System.out.println("[Barber] Broadcast message received: " + response.message);
             return response.message;
         } catch (Exception e) {
-            System.out.println("[Customer] Error on receiveBroadcast. " + e.getMessage());
+            System.out.println("[Barber] Error on receiveBroadcast. " + e.getMessage());
             return null;
         }
     }
