@@ -52,6 +52,22 @@ public class Coordinator {
         this.customers--;
     }
 
+    public void upBarber() {
+        this.barber++;
+    }
+
+    public void downBarber() {
+        this.barber--;
+    }
+
+    public void upSeats() {
+        this.seats++;
+    }
+
+    public void downSeats() {
+        this.seats--;
+    }
+
     public boolean addCustomerToQueue(Customer customer) {
         this.list.add(customer);
         return true;
@@ -69,11 +85,14 @@ public class Coordinator {
         this.port = this.getPortById(this.id);
         this.host = this.getHostById(this.id);
 
+        System.out.println("id: " + id);
+        System.out.println("host: " + this.host + ":" + this.port);
+
+        // Broadcast thread
         Thread broadcastThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                try {
-                    // tell the other I'm the coordinator
+                try { // tell the other I'm the coordinator
                     broadcast();
                 } catch (IOException e) {
                     System.out.println("[Coordinator] error on try broadcast " + e.getMessage());
@@ -83,7 +102,9 @@ public class Coordinator {
         broadcastThread.setName("broadcastThread");
         broadcastThread.start();
 
+        // Connectionts handler thread
         Thread connectionsHandler = new Thread(new Runnable() {
+
             @Override
             public void run() {
                 handleConnections();
@@ -92,12 +113,82 @@ public class Coordinator {
         connectionsHandler.setName("connectionsHandler");
         connectionsHandler.start();
 
+        // Barber listener thread
+        Thread barberListener = new Thread(new Runnable() {
+
+            @Override
+            public void run() {
+                try {
+                    listenBarber();
+                } catch (IOException e) {
+                    System.out.println("[Coordinator] error on barber listener thread " + e.getMessage());
+                }
+            }
+        });
+        barberListener.setName("barberListener");
+        barberListener.start();
+
+        // list proccess thread
+
+        Thread listProcessor = new Thread(new Runnable() {
+
+            @Override
+            public void run() {
+                try {
+                    processList();
+                } catch (IOException e) {
+                    System.out.println("[Coordinator] error on list process thread " + e.getMessage());
+                }
+            }
+        });
+        listProcessor.setName("listProcessor");
+        listProcessor.start();
+
         this.process();
 
         return false;
     }
 
     public void process() {
+
+        while (true) {
+            try {
+                Response res = SocketHelper.receiveMessage(this.port, 0);
+                System.out.println("[Coordinator] recv: " + res.message);
+
+                String[] split = res.message.split(" ");
+
+                if (!split[0].equals("request"))
+                    continue;
+
+                String id = split[1];
+
+                Customer c = this.getCustomerById(id, null);
+
+                if (this.customers < MAX_CHAIRS) {
+                    this.customers++;
+                    list.add(c);
+                } else {
+                    System.out.println("[Coordinator] ls " + list.size());
+                    SocketHelper.sendMessage(c.host, c.port, "denied");
+                }
+
+                /*
+                 * if (list.size() > 0) { c = list.get(0); list.remove(0);
+                 * SocketHelper.sendMessage(c.host, c.port, "granted"); } else {
+                 * System.out.println("[Coordinator] list size " + list.size());
+                 * TimeUnit.SECONDS.sleep(2); }
+                 */
+
+            } catch (Exception e) {
+                System.out.println("[Coordinator] error on process. " + e.getMessage());
+                continue;
+            }
+        }
+
+    }
+
+    public void process2() {
         try {
             while (true) {
                 if (this.customers > 0 && this.seats == 1) {
@@ -155,16 +246,12 @@ public class Coordinator {
                         System.out.println("[Coordinator] Connected: " + sc.getLocalAddress());
                     }
 
-                    if (key.isWritable()) {
-                        if (this.notifyQueue.size() > 0) {
-                            System.out.println("notify");
-                            Customer customer = notifyQueue.poll();
-                            String msg = "done";
-                            ByteBuffer bb = ByteBuffer.wrap(msg.getBytes());
-                            customer.sc.write(bb);
-                        }
-                    }
-
+                    /*
+                     * if (key.isWritable()) { if (this.notifyQueue.size() > 0) {
+                     * System.out.println("notify"); Customer customer = notifyQueue.poll(); String
+                     * msg = "done"; ByteBuffer bb = ByteBuffer.wrap(msg.getBytes());
+                     * customer.sc.write(bb); } }
+                     */
                     if (key.isReadable()) {
                         SocketChannel sc = (SocketChannel) key.channel();
                         ByteBuffer bb = ByteBuffer.allocate(1024);
@@ -175,35 +262,27 @@ public class Coordinator {
 
                         System.out.println("[Coordinator] customer " + id + " enters");
 
-                        if (type.equals("acquire")) {
-                            if (customers == MAX_CHAIRS || this.list.size() == MAX_CHAIRS) {
-                                System.out.println("[Coordinator] waiting room is full, come back later");
-                                /*
-                                 * String msg = "full"; bb = ByteBuffer.wrap(msg.getBytes()); sc.write(bb);
-                                 * bb.clear();
-                                 */
-                            } else {
-                                System.out.println("[Coordinator] go to waiting room ");
-                                Customer customer = this.getCustomerById(id, sc);
-                                if (addCustomerToQueue(customer)) {
-                                    upCustomer();
-                                }
-                            }
-                        } else {
-                            // this.removeById(Integer.parseInt(id));
-                            this.customers--;
-                            this.barber--;
-                            this.seats++;
-                        }
+                        /*
+                         * if (type.equals("acquire")) { if (customers == MAX_CHAIRS || this.list.size()
+                         * == MAX_CHAIRS) {
+                         * System.out.println("[Coordinator] waiting room is full, come back later");
+                         * 
+                         * String msg = "full"; bb = ByteBuffer.wrap(msg.getBytes()); sc.write(bb);
+                         * bb.clear(); } else { System.out.println("[Coordinator] go to waiting room ");
+                         * Customer customer = this.getCustomerById(id, sc); if
+                         * (addCustomerToQueue(customer)) { upCustomer(); } } } else { //
+                         * this.removeById(Integer.parseInt(id)); this.customers--; this.barber--;
+                         * this.seats++; }
+                         */
 
                         if (id.length() <= 0) {
                             sc.close();
                             System.out.println("Connection closed...");
                         }
                     }
-
                 }
             }
+
         } catch (Exception e) {
             System.out.println("[Coordinator] Error on Coordinator. " + e.getMessage());
         } finally {
@@ -225,22 +304,76 @@ public class Coordinator {
         System.out.println("[Coordinator] Broadcast");
 
         while (true) {
-            for (int i = 0; i < this.lines.size(); i++) {
-                String[] data = this.lines.get(i).split(" ", 3);
-                int id = Integer.parseInt(data[0]);
-
-                if (id < this.id) {
-                    String message = "coordinator " + this.id;
-                    SocketHelper.sendMessage(data[1], Integer.parseInt(data[2]), message);
-                }
-            }
-
             try {
-                TimeUnit.SECONDS.sleep(15);
-            } catch (InterruptedException e1) {
-                e1.printStackTrace();
-            }
+                String message = "coordinator " + this.id;
+                SocketHelper.sendMessage(this.host, Constants.BARBER_PORT, message);
 
+                for (int i = 0; i < this.lines.size(); i++) {
+                    String[] data = this.lines.get(i).split(" ", 3);
+                    int id = Integer.parseInt(data[0]);
+
+                    if (id < this.id) {
+                        SocketHelper.sendMessage(data[1], Integer.parseInt(data[2]), message);
+                    }
+                }
+
+                TimeUnit.SECONDS.sleep(15);
+
+            } catch (Exception e) {
+                System.out.println("[Coordinator] error o broadcast " + e.getMessage());
+            }
+        }
+    }
+
+    public void listenBarber() throws IOException {
+        System.out.println("[Coordinator] listenBarber");
+        while (true) {
+            try {
+                Response res = SocketHelper.receiveMessage(Constants.BARBER_LISTENER_PORT, 0);
+                System.out.println("[Coordinator] barber listener received: " + res.message);
+
+                if (res.message.equals("up barber")) {
+                    upBarber();
+                    SocketHelper.sendMessage(this.host, Constants.BARBER_PORT, "ack");
+                } else if (res.message.equals("down barber")) {
+                    downBarber();
+                    SocketHelper.sendMessage(this.host, Constants.BARBER_PORT, "ack");
+                } else if (res.message.equals("up seats")) {
+                    upSeats();
+                    SocketHelper.sendMessage(this.host, Constants.BARBER_PORT, "ack");
+                } else if (res.message.equals("down seats")) {
+                    downSeats();
+                    SocketHelper.sendMessage(this.host, Constants.BARBER_PORT, "ack");
+                } else {
+                    String[] msg = res.message.split(" ");
+                    if (msg[0].equals("release")) {
+                        downCustomer();
+                        // Customer c = getCustomerById(msg[1], null);
+                        // SocketHelper.sendMessage(c.host, c.port, "done");
+                        SocketHelper.sendMessage(this.host, Constants.BARBER_PORT, "ack");
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("[Coordinator] error o listenBarber " + e.getMessage());
+            }
+        }
+    }
+
+    public void processList() throws IOException {
+        System.out.println("[Coordinator] processList");
+        while (true) {
+            try {
+                if (list.size() > 0) {
+                    Customer c = list.get(0);
+                    list.remove(0);
+                    SocketHelper.sendMessage(c.host, c.port, "granted");
+                } else {
+                    System.out.println("[Coordinator] list size " + list.size());
+                    TimeUnit.SECONDS.sleep(2);
+                }
+            } catch (Exception e) {
+                System.out.println("[Coordinator] error o processList " + e.getMessage());
+            }
         }
     }
 

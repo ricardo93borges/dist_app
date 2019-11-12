@@ -114,7 +114,16 @@ class Customer {
                         break;
                     }
                 }
-                TimeUnit.SECONDS.sleep(1);
+
+                SocketHelper.sendMessage(this.coordinatorHost, this.coordinatorPort, "request " + this.id);
+                Response res = SocketHelper.receiveMessage(this.port, 0);
+                System.out.println("[Customer] received " + res.message);
+
+                if (res.message.equals("granted")) {
+                    SocketHelper.sendMessage(this.coordinatorHost, Constants.BARBER_PORT, Integer.toString(this.id));
+                } else {
+                    TimeUnit.SECONDS.sleep(3);
+                }
             }
 
             sc.close();
@@ -151,18 +160,16 @@ class Customer {
             String message = new String(bb.array()).trim();
             System.out.println("[Customer] Received: " + message);
 
-            if (message.equals("done")) {
-                this.waiting = false;
-
-                String msg = "release " + Integer.toString(this.id);
-                bb = ByteBuffer.wrap(msg.getBytes());
-                sc.write(bb);
-                bb.clear();
-
-                TimeUnit.SECONDS.sleep(1);
-            }
-
-            bb.clear();
+            /*
+             * if (message.equals("done")) { this.waiting = false;
+             * 
+             * String msg = "release " + Integer.toString(this.id); bb =
+             * ByteBuffer.wrap(msg.getBytes()); sc.write(bb); bb.clear();
+             * 
+             * TimeUnit.SECONDS.sleep(1); }
+             * 
+             * bb.clear();
+             */
 
             if (message.length() <= 0) {
                 sc.close();
@@ -170,18 +177,13 @@ class Customer {
             }
         }
 
-        if (key.isWritable()) {
-            if (!this.waiting) {
-                String msg = "acquire " + Integer.toString(this.id);
-                SocketChannel sc = (SocketChannel) key.channel();
-                ByteBuffer bb = ByteBuffer.wrap(msg.getBytes());
-                sc.write(bb);
-                bb.clear();
-                this.waiting = true;
-            } else {
-                System.out.println("[Customer] waiting ...");
-            }
-        }
+        /*
+         * if (key.isWritable()) { if (!this.waiting) { String msg = "acquire " +
+         * Integer.toString(this.id); SocketChannel sc = (SocketChannel) key.channel();
+         * ByteBuffer bb = ByteBuffer.wrap(msg.getBytes()); sc.write(bb); bb.clear();
+         * this.waiting = true; } else { System.out.println("[Customer] waiting ..."); }
+         * }
+         */
 
         return false;
     }
