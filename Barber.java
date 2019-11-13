@@ -69,17 +69,17 @@ class Barber {
                 if (restart)
                     continue;
 
+                System.out.println("[Barber] Customer " + id + " release lock");
+
+                restart = sendMessage("release " + id);
+                if (restart)
+                    continue;
+
                 restart = sendMessage("down barber");
                 if (restart)
                     continue;
 
                 restart = sendMessage("up seats");
-                if (restart)
-                    continue;
-
-                System.out.println("[Barber] Customer " + id + " release lock");
-
-                restart = sendMessage("release " + id);
                 if (restart)
                     continue;
 
