@@ -291,7 +291,6 @@ public class Coordinator {
                 } else {
                     String[] msg = res.message.split(" ");
                     if (msg[0].equals("release")) {
-                        // downCustomer();
                         SocketHelper.sendMessage(this.host, Constants.BARBER_PORT, "ack");
                     }
                 }
