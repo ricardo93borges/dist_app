@@ -118,15 +118,13 @@ class Customer {
                 }
 
                 if (selector.select() > 0) {
-                    Boolean doneStatus = this.process(selector.selectedKeys());
-                    if (doneStatus) {
-                        break;
-                    }
+                    this.process(selector.selectedKeys());
                 }
 
                 if (this.requestSent) {
                     res = SocketHelper.receiveMessage(this.port, Constants.TIMOUT);
                 } else {
+                    System.out.println("[Customer] send request ");
                     SocketHelper.sendMessage(this.coordinatorHost, this.coordinatorPort, "request " + this.id);
                     this.requestSent = true;
                     res = SocketHelper.receiveMessage(this.port, Constants.TIMOUT);
@@ -138,12 +136,11 @@ class Customer {
                 if (res.message.equals("granted")) {
                     SocketHelper.sendMessage(this.coordinatorHost, Constants.BARBER_PORT,
                             "acquier " + Integer.toString(this.id));
-                } else {
-                    TimeUnit.SECONDS.sleep(3);
                 }
+                TimeUnit.SECONDS.sleep(2);
 
             } catch (Exception e) {
-                System.out.println("[Customer] Error, continue " + e.getMessage());
+                // System.out.println("[Customer] Error, continue " + e.getMessage());
                 continue;
             }
         }
@@ -182,31 +179,12 @@ class Customer {
             String message = new String(bb.array()).trim();
             System.out.println("[Customer] Received: " + message);
 
-            /*
-             * if (message.equals("done")) { this.waiting = false;
-             * 
-             * String msg = "release " + Integer.toString(this.id); bb =
-             * ByteBuffer.wrap(msg.getBytes()); sc.write(bb); bb.clear();
-             * 
-             * TimeUnit.SECONDS.sleep(1); }
-             * 
-             * bb.clear();
-             */
-
             if (message.length() <= 0) {
                 sc.close();
                 System.out.println("Connection closed...");
                 setElectionStarted(true);
             }
         }
-
-        /*
-         * if (key.isWritable()) { if (!this.waiting) { String msg = "acquire " +
-         * Integer.toString(this.id); SocketChannel sc = (SocketChannel) key.channel();
-         * ByteBuffer bb = ByteBuffer.wrap(msg.getBytes()); sc.write(bb); bb.clear();
-         * this.waiting = true; } else { System.out.println("[Customer] waiting ..."); }
-         * }
-         */
 
         return false;
     }

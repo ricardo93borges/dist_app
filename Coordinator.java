@@ -129,7 +129,6 @@ public class Coordinator {
         barberListener.start();
 
         // list proccess thread
-
         Thread listProcessor = new Thread(new Runnable() {
 
             @Override
@@ -150,11 +149,10 @@ public class Coordinator {
     }
 
     public void process() {
-
         while (true) {
             try {
                 Response res = SocketHelper.receiveMessage(this.port, 0);
-                System.out.println("[Coordinator] recv: " + res.message);
+                // System.out.println("[Coordinator] recv: " + res.message);
 
                 String[] split = res.message.split(" ");
 
@@ -165,56 +163,21 @@ public class Coordinator {
 
                 Customer c = this.getCustomerById(id, null);
 
+                // System.out.println("[Coordinator] list: " + list.size() + ", customers: " +
+                // this.customers);
+
                 if (this.customers < MAX_CHAIRS) {
-                    this.customers++;
+                    upCustomer();
                     list.add(c);
                 } else {
-                    System.out.println("[Coordinator] ls " + list.size());
                     SocketHelper.sendMessage(c.host, c.port, "denied");
                 }
-
-                /*
-                 * if (list.size() > 0) { c = list.get(0); list.remove(0);
-                 * SocketHelper.sendMessage(c.host, c.port, "granted"); } else {
-                 * System.out.println("[Coordinator] list size " + list.size());
-                 * TimeUnit.SECONDS.sleep(2); }
-                 */
 
             } catch (Exception e) {
                 System.out.println("[Coordinator] error on process. " + e.getMessage());
                 continue;
             }
         }
-
-    }
-
-    public void process2() {
-        try {
-            while (true) {
-                if (this.customers > 0 && this.seats == 1) {
-                    this.barber++;
-                    this.seats--;
-
-                    Customer customer = this.list.get(0);
-                    list.remove(0);
-
-                    System.out.println("[Coordinator] barber cutting customer " + customer.id + " hair");
-
-                    String msg = "done";
-                    ByteBuffer bb = ByteBuffer.wrap(msg.getBytes());
-                    customer.sc.write(bb);
-                    bb.clear();
-
-                } else {
-                    System.out.println("[Coordinator] barber sleeping");
-                    TimeUnit.SECONDS.sleep(1);
-                }
-
-            }
-        } catch (Exception e) {
-            System.out.println("[Coordinator] error on process. " + e.getMessage());
-        }
-
     }
 
     public void handleConnections() {
@@ -246,12 +209,6 @@ public class Coordinator {
                         System.out.println("[Coordinator] Connected: " + sc.getLocalAddress());
                     }
 
-                    /*
-                     * if (key.isWritable()) { if (this.notifyQueue.size() > 0) {
-                     * System.out.println("notify"); Customer customer = notifyQueue.poll(); String
-                     * msg = "done"; ByteBuffer bb = ByteBuffer.wrap(msg.getBytes());
-                     * customer.sc.write(bb); } }
-                     */
                     if (key.isReadable()) {
                         SocketChannel sc = (SocketChannel) key.channel();
                         ByteBuffer bb = ByteBuffer.allocate(1024);
@@ -261,19 +218,6 @@ public class Coordinator {
                         String id = message[1];
 
                         System.out.println("[Coordinator] customer " + id + " enters");
-
-                        /*
-                         * if (type.equals("acquire")) { if (customers == MAX_CHAIRS || this.list.size()
-                         * == MAX_CHAIRS) {
-                         * System.out.println("[Coordinator] waiting room is full, come back later");
-                         * 
-                         * String msg = "full"; bb = ByteBuffer.wrap(msg.getBytes()); sc.write(bb);
-                         * bb.clear(); } else { System.out.println("[Coordinator] go to waiting room ");
-                         * Customer customer = this.getCustomerById(id, sc); if
-                         * (addCustomerToQueue(customer)) { upCustomer(); } } } else { //
-                         * this.removeById(Integer.parseInt(id)); this.customers--; this.barber--;
-                         * this.seats++; }
-                         */
 
                         if (id.length() <= 0) {
                             sc.close();
@@ -317,7 +261,7 @@ public class Coordinator {
                     }
                 }
 
-                TimeUnit.SECONDS.sleep(15);
+                TimeUnit.SECONDS.sleep(10);
 
             } catch (Exception e) {
                 System.out.println("[Coordinator] error o broadcast " + e.getMessage());
@@ -347,9 +291,7 @@ public class Coordinator {
                 } else {
                     String[] msg = res.message.split(" ");
                     if (msg[0].equals("release")) {
-                        downCustomer();
-                        // Customer c = getCustomerById(msg[1], null);
-                        // SocketHelper.sendMessage(c.host, c.port, "done");
+                        // downCustomer();
                         SocketHelper.sendMessage(this.host, Constants.BARBER_PORT, "ack");
                     }
                 }
@@ -366,10 +308,11 @@ public class Coordinator {
                 if (list.size() > 0) {
                     Customer c = list.get(0);
                     list.remove(0);
+                    downCustomer();
                     SocketHelper.sendMessage(c.host, c.port, "granted");
                 } else {
-                    System.out.println("[Coordinator] list size " + list.size());
-                    TimeUnit.SECONDS.sleep(2);
+                    // System.out.println("[Coordinator] list size " + list.size());
+                    TimeUnit.SECONDS.sleep(1);
                 }
             } catch (Exception e) {
                 System.out.println("[Coordinator] error o processList " + e.getMessage());

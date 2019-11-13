@@ -6,12 +6,14 @@ class Barber {
     static int port;
     static String coordinatorHost;
     static int coordinatorPort;
+    static String coordinatorId;
 
     public static void main(String[] args) {
         host = null;
         port = Constants.BARBER_PORT;
         coordinatorHost = null;
         coordinatorPort = 0;
+        coordinatorId = null;
 
         run();
     }
@@ -28,9 +30,14 @@ class Barber {
                     while (true) {
                         String response = receiveBroadcast();
                         String id = response.split(" ", 2)[1];
+
+                        if (id.equals(coordinatorId))
+                            continue;
+
                         Coordinator coordinator = getCoordinatorById(Integer.parseInt(id));
                         coordinatorHost = coordinator.getHost();
                         coordinatorPort = coordinator.getPort();
+                        coordinatorId = id;
                         host = coordinatorHost;
                         System.out.println("[Barber] coordinator " + coordinatorHost + ":" + coordinatorPort);
                     }
@@ -80,7 +87,7 @@ class Barber {
                     continue;
 
             } catch (IOException e) {
-                System.out.println("[Barber] IOException " + e.getMessage());
+                // System.out.println("[Barber] IOException " + e.getMessage());
                 continue;
             } catch (Exception e) {
                 System.out.println("[Barber] error on loop " + e.getMessage());
@@ -94,7 +101,7 @@ class Barber {
             SocketHelper.receiveMessage(Constants.BARBER_PORT, Constants.TIMOUT);
             return false;
         } catch (IOException e) {
-            System.out.println("[Barber] IOException " + e.getMessage());
+            // System.out.println("[Barber] IOException " + e.getMessage());
             // coordinatorHost = null;
             return true;
         }
@@ -107,10 +114,11 @@ class Barber {
      * @throws IOException
      */
     public static String receiveBroadcast() throws IOException {
-        System.out.println("[Barber] receiveBroadcast ");
+        // System.out.println("[Barber] receiveBroadcast ");
         try {
             Response response = SocketHelper.receiveMessage(Constants.BARBER_BRODCAST_LISTENER_PORT, 0);
-            System.out.println("[Barber] Broadcast message received: " + response.message);
+            // System.out.println("[Barber] Broadcast message received: " +
+            // response.message);
             return response.message;
         } catch (Exception e) {
             System.out.println("[Barber] Error on receiveBroadcast. " + e.getMessage());
