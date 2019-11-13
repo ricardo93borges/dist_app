@@ -19,9 +19,6 @@ class Barber {
     }
 
     public static int run() {
-
-        System.out.println("[Barber] host " + host + ":" + port);
-
         // Broadcast thread
         Thread broadcastThread = new Thread(new Runnable() {
             @Override

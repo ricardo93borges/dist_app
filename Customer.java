@@ -28,7 +28,7 @@ class Customer {
     Thread electionListener;
     List<String> lines;
     boolean waiting = false;
-    boolean requestSent = true;
+    boolean requestSent = false;
 
     public Customer(int id, String host, int port, SocketChannel sc, String coordinatorHost, int coordinatorPort,
             List<String> lines) {
