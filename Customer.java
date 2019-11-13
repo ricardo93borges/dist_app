@@ -134,7 +134,7 @@ class Customer {
                 this.requestSent = false;
 
                 if (res.message.equals("granted")) {
-                    SocketHelper.sendMessage(this.coordinatorHost, Constants.BARBER_PORT,
+                    SocketHelper.sendMessage(Constants.BARBER_HOST, Constants.BARBER_PORT,
                             "acquier " + Integer.toString(this.id));
                 }
                 TimeUnit.SECONDS.sleep(2);
