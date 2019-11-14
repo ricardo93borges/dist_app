@@ -46,26 +46,32 @@ public class Coordinator {
 
     public void upCustomer() {
         this.customers++;
+        storage("up customer");
     }
 
     public void downCustomer() {
         this.customers--;
+        storage("down customer");
     }
 
     public void upBarber() {
         this.barber++;
+        storage("up barber");
     }
 
     public void downBarber() {
         this.barber--;
+        storage("down barber");
     }
 
     public void upSeats() {
         this.seats++;
+        storage("up seats");
     }
 
     public void downSeats() {
         this.seats--;
+        storage("down seats");
     }
 
     public boolean addCustomerToQueue(Customer customer) {
@@ -143,9 +149,26 @@ public class Coordinator {
         listProcessor.setName("listProcessor");
         listProcessor.start();
 
+        this.getStorage();
         this.process();
 
         return false;
+    }
+
+    public void getStorage() {
+        System.out.println("[Coordinator] get storage ");
+        try {
+            SocketHelper.sendMessage(Constants.STORAGE_HOST, Constants.STORAGE_PORT, "get");
+            Response res = SocketHelper.receiveMessage(this.port, 0);
+
+            String[] split = res.message.split(" ");
+            this.barber = Integer.parseInt(split[0]);
+            this.seats = Integer.parseInt(split[1]);
+            this.customers = Integer.parseInt(split[2]);
+
+        } catch (Exception e) {
+            System.out.println("[Coordinator] error on get storage " + e.getMessage());
+        }
     }
 
     public void process() {
@@ -251,6 +274,7 @@ public class Coordinator {
             try {
                 String message = "coordinator " + this.id;
                 SocketHelper.sendMessage(Constants.BARBER_HOST, Constants.BARBER_BRODCAST_LISTENER_PORT, message);
+                SocketHelper.sendMessage(Constants.BARBER_HOST, Constants.STORAGE_BRODCAST_LISTENER_PORT, message);
 
                 for (int i = 0; i < this.lines.size(); i++) {
                     String[] data = this.lines.get(i).split(" ", 3);
@@ -316,6 +340,14 @@ public class Coordinator {
             } catch (Exception e) {
                 System.out.println("[Coordinator] error o processList " + e.getMessage());
             }
+        }
+    }
+
+    public void storage(String msg) {
+        try {
+            SocketHelper.sendMessage(Constants.STORAGE_HOST, Constants.STORAGE_PORT, msg);
+        } catch (Exception e) {
+            System.out.println("[Coordinator] error on storage " + e.getMessage());
         }
     }
 
