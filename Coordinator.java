@@ -256,9 +256,9 @@ public class Coordinator {
                     String[] data = this.lines.get(i).split(" ", 3);
                     int id = Integer.parseInt(data[0]);
 
-                    if (id < this.id) {
-                        SocketHelper.sendMessage(data[1], Integer.parseInt(data[2]), message);
-                    }
+                    // if (id < this.id) {
+                    SocketHelper.sendMessage(data[1], Integer.parseInt(data[2]), message);
+                    // }
                 }
 
                 TimeUnit.SECONDS.sleep(10);

@@ -47,7 +47,7 @@ public class Main {
 
     public static void setupCustomer(String coordinatorHost, int coordinatorPort, int id, String host, int port,
             List<String> lines) {
-        Customer customer = new Customer(id, host, port, null, coordinatorHost, coordinatorPort, lines);
+        Customer customer = new Customer(id, host, port, null, null, 0, lines);
         int response = customer.run();
 
         /**
