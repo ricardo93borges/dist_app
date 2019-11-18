@@ -62,6 +62,19 @@ public class Storage {
 
     public static void run() {
 
+        try {
+            String response = receiveBroadcast();
+            String cid = response.split(" ", 2)[1];
+
+            Coordinator coordinator = getCoordinatorById(Integer.parseInt(cid));
+            coordinatorHost = coordinator.getHost();
+            coordinatorPort = coordinator.getPort();
+            coordinatorId = cid;
+            System.out.println("[Storage] coordinator " + coordinatorHost + ":" + coordinatorPort);
+        } catch (IOException e) {
+            System.out.println("[Storage] error on try broadcast " + e.getMessage());
+        }
+
         // Broadcast thread
         Thread broadcastThread = new Thread(new Runnable() {
             @Override
